@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <link rel="manifest" href="manifest.json" />
+  <title>Midwest Pools OS</title>
+  <style>
+    :root {
+      --bg:#f4f6f8; --card:#fff; --text:#111827; --muted:#6b7280;
+      --line:#e5e7eb; --accent:#2563eb; --danger:#dc2626; --warn:#d97706; --ok:#059669;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--text); }
+    header { position:sticky; top:0; z-index:5; background:#111827; color:#fff; padding:14px 16px 12px; }
+    header .title { font-size:21px; font-weight:800; }
+    header .sub { font-size:13px; opacity:.8; margin-top:2px; }
+    main { padding:14px 14px 92px; max-width:780px; margin:auto; }
+    .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,.05); margin-bottom:12px; }
+    .metric { font-size:28px; font-weight:800; }
+    .label { font-size:12px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    h2 { font-size:18px; margin:4px 0 12px; }
+    h3 { margin:0 0 6px; font-size:16px; }
+    .row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .pill { display:inline-block; padding:4px 9px; border-radius:999px; font-size:12px; font-weight:800; background:#eef2ff; }
+    .danger { color:var(--danger); }
+    .warn { color:var(--warn); }
+    .ok { color:var(--ok); }
+    .muted { color:var(--muted); }
+    button { border:none; border-radius:12px; padding:11px 14px; font-weight:800; font-size:14px; cursor:pointer; }
+    .primary { background:var(--accent); color:white; }
+    .secondary { background:#e5e7eb; color:#111827; }
+    .ghost { background:transparent; border:1px solid var(--line); }
+    input, select, textarea { width:100%; border:1px solid #d1d5db; border-radius:10px; padding:11px 12px; font:inherit; background:#fff; }
+    textarea { min-height:90px; resize:vertical; }
+    .field { margin:9px 0; }
+    .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; font-weight:700; }
+    .job { padding:12px 0; border-top:1px solid var(--line); }
+    .job:first-child { border-top:none; }
+    nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(6,1fr); z-index:10; padding-bottom:env(safe-area-inset-bottom); }
+    nav button { background:#fff; border-radius:0; padding:11px 4px 9px; color:#6b7280; font-size:12px; }
+    nav button.active { color:var(--accent); }
+    nav .ico { display:block; font-size:20px; margin-bottom:2px; }
+    .screen { display:none; }
+    .screen.active { display:block; }
+    .task { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-top:1px solid var(--line); }
+    .task input[type=checkbox] { width:22px; height:22px; margin-top:2px; }
+    .task-main { flex:1; }
+    .task-title { font-weight:750; }
+    .tiny { font-size:12px; color:var(--muted); }
+    .ai-box { background:#111827; color:#fff; }
+    .ai-box textarea { background:#fff; color:#111; }
+    .ai-response { white-space:pre-wrap; line-height:1.4; margin-top:10px; padding:12px; border-radius:12px; background:#1f2937; }
+    .fab { position:fixed; right:18px; bottom:78px; width:56px; height:56px; border-radius:50%; background:var(--accent); color:#fff; font-size:28px; box-shadow:0 8px 20px rgba(37,99,235,.35); z-index:9; }
+    dialog { width:min(92vw,520px); border:none; border-radius:18px; padding:0; }
+    dialog::backdrop { background:rgba(0,0,0,.35); }
+    .dialog-body { padding:16px; }
+    .dialog-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+    .stagebar { height:8px; background:#e5e7eb; border-radius:999px; overflow:hidden; margin-top:8px; }
+    .stagebar > div { height:100%; background:var(--accent); }
+    .section-title { font-size:13px; text-transform:uppercase; color:var(--muted); font-weight:800; margin:16px 0 6px; }
+
+    .schedule-switch{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+    .schedule-switch button{background:#eef2f7;color:#374151}
+    .schedule-switch button.active{background:var(--accent);color:#fff}
+    .calendar-wrap,.gantt-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(92px,1fr));gap:6px;min-width:700px}
+    .cal-head{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;text-align:center;padding:4px}
+    .cal-day{min-height:112px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px}
+    .cal-day.today{outline:2px solid var(--accent);outline-offset:-2px}
+    .cal-date{font-weight:800;font-size:13px;margin-bottom:6px}
+    .cal-job{display:block;width:100%;text-align:left;padding:6px 7px;margin:4px 0;border-radius:8px;background:#eef2ff;color:#1f3b76;font-size:11px;font-weight:700;line-height:1.2}
+    .cal-job.overdue{background:#fee2e2;color:#991b1b}
+    .cal-job.issue{background:#fff7ed;color:#9a3412}
+    .gantt-table{min-width:1050px}
+    .gantt-head,.gantt-row{display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:center}
+    .gantt-head{font-size:11px;font-weight:800;color:var(--muted);margin-bottom:8px}
+    .gantt-row{padding:10px 0;border-top:1px solid var(--line)}
+    .gantt-name{min-width:0}
+    .gantt-name strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .gantt-track{position:relative;display:grid;grid-template-columns:repeat(22,1fr);gap:3px;align-items:center}
+    .gantt-step{height:18px;border-radius:5px;background:#e5e7eb;position:relative}
+    .gantt-step.done{background:#9ca3af}
+    .gantt-step.current{background:var(--accent)}
+    .gantt-step.issue{box-shadow:inset 0 0 0 2px var(--warn)}
+    .gantt-step.overdue{box-shadow:inset 0 0 0 2px var(--danger)}
+    .gantt-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin:8px 0 2px}
+    .dot{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:-1px;background:#e5e7eb}.dot.done{background:#9ca3af}.dot.current{background:var(--accent)}
+    .division-switch{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+    .division-switch button{background:#eef2f7;color:#374151}
+    .division-switch button.active{background:var(--accent);color:#fff}
+    .money-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+    .inventory-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}
+    @media(max-width:520px){nav .ico{font-size:17px}nav button{font-size:10px;padding-left:1px;padding-right:1px}.money-grid{grid-template-columns:1fr 1fr}}
+  
+    .auth-overlay{position:fixed;inset:0;z-index:1000;background:#111827;display:flex;align-items:center;justify-content:center;padding:20px}
+    .auth-card{width:min(94vw,430px);background:#fff;border-radius:20px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+    .auth-card h1{margin:0 0 4px;font-size:24px}.auth-card p{margin:0 0 18px;color:var(--muted)}
+    .auth-error{color:var(--danger);font-size:13px;min-height:18px;margin-top:8px}
+    .header-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .user-button{background:rgba(255,255,255,.12);color:#fff;padding:8px 10px;border:1px solid rgba(255,255,255,.2);font-size:12px}
+    .role-badge{display:inline-block;margin-top:4px;font-size:11px;font-weight:800;color:#dbeafe}
+    .admin-menu{position:fixed;right:12px;top:64px;z-index:50;width:min(88vw,320px);background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;box-shadow:0 18px 45px rgba(0,0,0,.18);display:none}
+    .admin-menu.open{display:block}.admin-menu button{width:100%;text-align:left;margin:3px 0}
+    .hidden-by-role{display:none!important}
+    .trash-item{padding:12px 0;border-top:1px solid var(--line)}.trash-item:first-child{border-top:none}
+    .danger-btn{background:#fee2e2;color:#991b1b}.success-btn{background:#dcfce7;color:#166534}
+    .security-note{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.35}
+
+  </style>
+</head>
+<body>
+
+<div id="authOverlay" class="auth-overlay">
+  <div class="auth-card">
+    <h1>Midwest Pools OS</h1>
+    <p>Secure sign in</p>
+    <div class="field"><label>Email</label><input id="loginEmail" type="email" autocomplete="username" placeholder="you@midwestpools.com"></div>
+    <div class="field"><label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password"></div>
+    <button class="primary" style="width:100%;margin-top:6px" onclick="signIn()">Sign In</button>
+    <div id="authError" class="auth-error"></div>
+    <div class="security-note">Authentication is handled by Supabase. Passwords are not stored in this page or in browser local storage.</div>
+  </div>
+</div>
+<header>
+  <div class="header-row">
+    <div>
+      <div class="title">Midwest Pools OS</div>
+      <div class="sub" id="todayText"></div>
+      <div class="role-badge" id="roleBadge"></div>
+    </div>
+    <button class="user-button" id="userMenuBtn" onclick="toggleUserMenu()">Account ▾</button>
+  </div>
+</header>
+
+<div id="userMenu" class="admin-menu">
+  <div style="padding:6px 8px 10px">
+    <strong id="signedInName">Signed in</strong>
+    <div class="tiny" id="signedInEmail"></div>
+  </div>
+  <button class="ghost" id="trashMenuBtn" onclick="openTrash()">🗑️ Trash</button>
+  <button class="ghost" onclick="signOut()">Sign out</button>
+</div>
+
+<main>
+  <section id="today" class="screen active">
+    <div class="grid">
+      <div class="card"><div class="label">Needs Attention</div><div class="metric danger" id="mAttention">0</div></div>
+      <div class="card"><div class="label">Behind</div><div class="metric warn" id="mBehind">0</div></div>
+      <div class="card"><div class="label">Active Jobs</div><div class="metric" id="mActive">0</div></div>
+      <div class="card"><div class="label">Payments Due</div><div class="metric" id="mDue">$0</div></div>
+    </div>
+
+    <div class="card ai-box">
+      <h2>AI Daily Brief</h2>
+      <div id="dailyBrief">Loading...</div>
+    </div>
+
+    <div class="card">
+      <div class="row"><h2>Today's Priorities</h2><span class="pill" id="priorityCount">0 items</span></div>
+      <div id="priorityList"></div>
+    </div>
+
+    <div class="card">
+      <h2>Jobs by Stage</h2>
+      <div id="stageSummary"></div>
+    </div>
+  </section>
+
+  <section id="jobs" class="screen">
+    <div class="row">
+      <h2 id="jobsHeading">Residential</h2>
+      <button class="primary" id="newJobBtn" onclick="openNewJob()">+ New Job</button>
+    </div>
+    <div class="division-switch">
+      <button id="divResidential" class="active" onclick="setDivision('residential')">Residential</button>
+      <button id="divCommercial" onclick="setDivision('commercial')">Commercial</button>
+      <button id="divInventory" onclick="setDivision('inventory')">Pool Inventory</button>
+    </div>
+    <div id="jobSearchWrap" class="field"><input id="jobSearch" placeholder="Search customer, address or stage..." oninput="renderJobs()" /></div>
+    <div id="jobsList"></div>
+  </section>
+
+  <section id="schedule" class="screen">
+    <div class="row"><h2>Schedule</h2><span class="pill">Company-wide</span></div>
+    <div class="schedule-switch">
+      <button id="schedListBtn" class="active" onclick="setScheduleView('list')">List</button>
+      <button id="schedCalBtn" onclick="setScheduleView('calendar')">30-Day</button>
+      <button id="schedGanttBtn" onclick="setScheduleView('gantt')">Gantt</button>
+    </div>
+    <div class="card">
+      <div id="scheduleControls">
+        <div class="field">
+          <label>Show</label>
+          <select id="scheduleFilter" onchange="renderSchedule()">
+            <option value="7">Next 7 days</option>
+            <option value="14">Next 14 days</option>
+            <option value="30" selected>Next 30 days</option>
+          </select>
+        </div>
+      </div>
+      <div id="scheduleList"></div>
+    </div>
+  </section>
+
+
+  <section id="money" class="screen">
+    <div class="row"><h2>Money</h2><span class="pill">Company-wide</span></div>
+    <div class="money-grid">
+      <div class="card"><div class="label">Outstanding</div><div class="metric" id="moneyOutstanding">$0</div></div>
+      <div class="card"><div class="label">Open Change Orders</div><div class="metric" id="moneyCOCount">0</div></div>
+      <div class="card"><div class="label">Invoices Due</div><div class="metric" id="moneyInvoiceCount">0</div></div>
+      <div class="card"><div class="label">Payments Received</div><div class="metric" id="moneyPaid">$0</div></div>
+    </div>
+    <div class="card"><h2>Change Orders</h2><div id="changeOrdersList"></div></div>
+    <div class="card"><h2>Invoices & Payment Requests</h2><div id="invoiceList"></div></div>
+    <div class="card"><h2>Financing</h2><div class="muted">Financing applications and lender document tracking will appear here.</div></div>
+  </section>
+
+  <section id="warranty" class="screen">
+    <div class="row"><h2>Warranty</h2><span class="pill">Equipment + Shells</span></div>
+    <div class="card"><div class="muted">Warranty registrations, equipment serial numbers, claims, and documents are kept here.</div></div>
+  </section>
+
+  <section id="ai" class="screen">
+    <div class="card ai-box">
+      <h2>Ask Midwest AI</h2>
+      <div class="tiny" style="color:#cbd5e1;margin-bottom:8px">
+        Try: “What jobs are behind?”, “Who owes us money?”, “Show jobs waiting on concrete” or “What needs attention?”
+      </div>
+      <textarea id="aiInput" placeholder="Type or dictate your question..."></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="secondary" onclick="startVoice()">🎤 Dictate</button>
+        <button class="primary" onclick="askAI()">Ask AI</button>
+      </div>
+      <div id="aiResponse" class="ai-response">Your answer will appear here.</div>
+    </div>
+  </section>
+</main>
+
+<button class="fab" onclick="openNewJob()">+</button>
+
+<nav>
+  <button class="active" onclick="showScreen('today',this)"><span class="ico">🏠</span>Today</button>
+  <button onclick="showScreen('jobs',this)"><span class="ico">🏊</span>Jobs</button>
+  <button onclick="showScreen('schedule',this)"><span class="ico">📅</span>Schedule</button>
+  <button onclick="showScreen('money',this)"><span class="ico">💵</span>Money</button>
+  <button onclick="showScreen('warranty',this)"><span class="ico">🛡️</span>Warranty</button>
+  <button onclick="showScreen('ai',this)"><span class="ico">✨</span>AI</button>
+</nav>
+
+<dialog id="jobDialog">
+  <div class="dialog-body">
+    <h2 id="dialogTitle">New Job</h2>
+    <input type="hidden" id="jobId" />
+    <div class="field"><label>Section</label><select id="jobType"><option value="residential">Residential</option><option value="commercial">Commercial</option></select></div>
+    <div class="field"><label>Customer / Project</label><input id="customer" /></div>
+    <div class="field"><label>Job address</label><input id="address" /></div>
+    <div class="field"><label>Pool model</label><input id="model" placeholder="e.g. Grand Traverse 14x36" /></div>
+    <div class="field"><label>Stage</label><select id="stage"></select></div>
+    <div class="field"><label>Project manager</label><input id="pm" /></div>
+    <div class="field"><label>Next scheduled date</label><input id="nextDate" type="date" /></div>
+    <div class="field"><label>Balance due</label><input id="balance" type="number" min="0" step="100" /></div>
+    <div class="field"><label>Issue / blocker</label><textarea id="issue" placeholder="Leave blank if none"></textarea></div>
+    <div class="dialog-actions">
+      <button class="secondary" onclick="jobDialog.close()">Cancel</button>
+      <button class="primary" onclick="saveJob()">Save Job</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="detailDialog">
+  <div class="dialog-body">
+    <div id="jobDetail"></div>
+    <div class="dialog-actions">
+      <button class="secondary" onclick="detailDialog.close()">Close</button>
+    </div>
+  </div>
+</dialog>
+
+
+<dialog id="trashDialog">
+  <div class="dialog-body">
+    <div class="row"><h2>Trash</h2><span class="pill">Recoverable</span></div>
+    <div class="muted" style="margin-bottom:8px">Deleted jobs stay here until restored. Only the Super Administrator can permanently delete them.</div>
+    <div id="trashList"></div>
+    <div class="dialog-actions"><button class="secondary" onclick="trashDialog.close()">Close</button></div>
+  </div>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+
+const SUPABASE_URL = "https://hwkggwdnhjqtmnanazbx.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Esu7KNlYO-1ISRGTCjLmyQ_BGn_h9VO";
+const SUPER_ADMIN_EMAIL = "midwestpoolsinc@gmail.com";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+let currentUser = null;
+let currentProfile = null;
+let currentRole = "signed_out";
+
+function normalizeRole(raw){
+  const r=String(raw||"").toLowerCase().replace(/\s+/g,"_").replace(/-/g,"_");
+  if(currentUser?.email?.toLowerCase()===SUPER_ADMIN_EMAIL) return "super_admin";
+  if(["super_admin","superadministrator","super_administrator"].includes(r)) return "super_admin";
+  if(["admin","office","admin_office","administrator"].includes(r)) return "admin_office";
+  if(["employee","pm","employee_pm","project_manager"].includes(r)) return "employee_pm";
+  if(["subcontractor","sub","contractor"].includes(r)) return "subcontractor";
+  if(["customer","client"].includes(r)) return "customer";
+  return "customer";
+}
+function roleLabel(r){
+  return {super_admin:"Super Administrator",admin_office:"Admin / Office",employee_pm:"Employee / PM",subcontractor:"Subcontractor",customer:"Customer"}[r]||"User";
+}
+function can(permission){
+  const rules={
+    super_admin:["money","edit_job","create_job","inventory","inventory_financials","trash","permanent_delete","warranty","schedule","ai"],
+    admin_office:["money","edit_job","create_job","inventory","inventory_financials","trash","warranty","schedule","ai"],
+    employee_pm:["edit_job","create_job","inventory","warranty","schedule","ai"],
+    subcontractor:["warranty","schedule","ai"],
+    customer:["warranty","ai"]
+  };
+  return (rules[currentRole]||[]).includes(permission);
+}
+function isSuperAdmin(){ return currentRole==="super_admin"; }
+
+async function signIn(){
+  const email=document.getElementById("loginEmail").value.trim();
+  const password=document.getElementById("loginPassword").value;
+  const err=document.getElementById("authError"); err.textContent="";
+  if(!email||!password){ err.textContent="Enter your email and password."; return; }
+  const {data,error}=await sb.auth.signInWithPassword({email,password});
+  if(error){ err.textContent=error.message; return; }
+  await applySession(data.session);
+}
+async function signOut(){
+  await sb.auth.signOut();
+  currentUser=null; currentProfile=null; currentRole="signed_out";
+  document.getElementById("userMenu").classList.remove("open");
+  document.getElementById("authOverlay").style.display="flex";
+}
+async function applySession(session){
+  if(!session?.user){
+    document.getElementById("authOverlay").style.display="flex";
+    return;
+  }
+  currentUser=session.user;
+  let profile=null;
+  try{
+    const {data}=await sb.from("profiles").select("*").eq("id",session.user.id).maybeSingle();
+    profile=data||null;
+  }catch(_){}
+  currentProfile=profile;
+  currentRole=normalizeRole(profile?.role);
+  document.getElementById("signedInEmail").textContent=currentUser.email||"";
+  document.getElementById("signedInName").textContent=
+    profile?.full_name||profile?.display_name||[profile?.first_name,profile?.last_name].filter(Boolean).join(" ")||currentUser.email||"Signed in";
+  document.getElementById("roleBadge").textContent=roleLabel(currentRole);
+  document.getElementById("authOverlay").style.display="none";
+  applyRoleUI();
+  renderAll();
+}
+function applyRoleUI(){
+  const moneyNav=[...document.querySelectorAll("nav button")].find(b=>b.textContent.includes("Money"));
+  if(moneyNav) moneyNav.classList.toggle("hidden-by-role",!can("money"));
+  document.getElementById("newJobBtn")?.classList.toggle("hidden-by-role",!can("create_job"));
+  document.querySelector(".fab")?.classList.toggle("hidden-by-role",!can("create_job"));
+  document.getElementById("trashMenuBtn")?.classList.toggle("hidden-by-role",!can("trash"));
+  const invBtn=document.getElementById("divInventory");
+  if(invBtn) invBtn.classList.toggle("hidden-by-role",!can("inventory"));
+}
+function toggleUserMenu(){ document.getElementById("userMenu").classList.toggle("open"); }
+document.addEventListener("click",e=>{
+  const menu=document.getElementById("userMenu"),btn=document.getElementById("userMenuBtn");
+  if(menu&&btn&&!menu.contains(e.target)&&!btn.contains(e.target)) menu.classList.remove("open");
+});
+
+
+const stages = [
+  "Sold","Permitting","Miss Dig","Layout","Excavation","Pool Set","Plumbing",
+  "Electrical","Open Hole Inspection","Mechanical Inspection","Deck Forming",
+  "Bonding/Sand Inspection","Concrete","Power Cover","Fence","Startup",
+  "Final Walkthrough","Pool School","Final Inspection","Safety Cover","Final Payment","Complete"
+];
+
+const taskTemplates = {
+ "Sold":["Signed contract","Customer info complete","Drawings and permits ready"],
+ "Permitting":["Send permit applications","Track permit approval"],
+ "Miss Dig":["Schedule Miss Dig","Verify site cleared"],
+ "Layout":["Layout pool","Confirm no site conflicts"],
+ "Excavation":["Schedule install with customer","Confirm excavation crew"],
+ "Pool Set":["Install pool","Collect installation payment"],
+ "Plumbing":["Mechanical install","Pressure test plumbing"],
+ "Electrical":["Confirm electrical install","Electrical inspection"],
+ "Open Hole Inspection":["Schedule open hole inspection"],
+ "Mechanical Inspection":["Mechanical inspection"],
+ "Deck Forming":["Form pool deck"],
+ "Bonding/Sand Inspection":["Bonding grid / sand inspection"],
+ "Concrete":["Pour concrete"],
+ "Power Cover":["Power cover post-pour install"],
+ "Fence":["Install fence after concrete"],
+ "Startup":["Startup"],
+ "Final Walkthrough":["Final walkthrough with Midwest rep"],
+ "Pool School":["Pool school"],
+ "Final Inspection":["Final inspections"],
+ "Safety Cover":["Install safety cover"],
+ "Final Payment":["Collect final payment and follow up"],
+ "Complete":["Close job"]
+};
+
+const sampleJobs = [
+ {id:crypto.randomUUID(),jobType:"residential",customer:"Smith",address:"52801 Forest Grove",model:"Grand Traverse 14x36",stage:"Plumbing",pm:"Dan",nextDate:addDays(1),balance:18500,issue:"Return line leak needs review",updated:Date.now()-86400000*2,tasks:{}},
+ {id:crypto.randomUUID(),jobType:"residential",customer:"Johnson",address:"10433 East Newburg Rd",model:"Lake Michigan",stage:"Concrete",pm:"Gage",nextDate:addDays(3),balance:0,issue:"",updated:Date.now()-86400000,tasks:{}},
+ {id:crypto.randomUUID(),jobType:"residential",customer:"Miller",address:"1240 Oak Ridge Dr",model:"Grand Traverse 14x36",stage:"Miss Dig",pm:"Dan",nextDate:addDays(-1),balance:12000,issue:"Miss Dig not cleared yet",updated:Date.now()-86400000*5,tasks:{}},
+ {id:crypto.randomUUID(),jobType:"residential",customer:"Thompson",address:"7850 Pine View",model:"Torch Lake",stage:"Pool School",pm:"Gage",nextDate:addDays(2),balance:4200,issue:"",updated:Date.now()-86400000,tasks:{}},
+ {id:crypto.randomUUID(),jobType:"commercial",customer:"Anderson Commercial Center",address:"3300 Lake Rd",model:"Grand Traverse 14x36",stage:"Permitting",pm:"Dan",nextDate:addDays(5),balance:0,issue:"Waiting on township approval",updated:Date.now()-86400000*4,tasks:{}}
+];
+
+function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+
+let jobs = JSON.parse(localStorage.getItem("mp_jobs") || "null") || sampleJobs;
+jobs = jobs.map(j=>({jobType:j.jobType||"residential",deletedAt:j.deletedAt||null,...j}));
+let division="residential";
+let inventory = JSON.parse(localStorage.getItem("mp_inventory") || "null") || [
+ {id:crypto.randomUUID(),model:"Grand Traverse 14x36",color:"Ocean Blue",serial:"LE-GT-001",location:"Michigan Yard",status:"available",cost:16374,dealerPrice:27000,retailPrice:0},
+ {id:crypto.randomUUID(),model:"Lake Michigan",color:"Caribbean Blue",serial:"LE-LM-002",location:"Bremen",status:"reserved",cost:15000,dealerPrice:25000,retailPrice:0}
+];
+let moneyData = JSON.parse(localStorage.getItem("mp_money") || "null") || {
+ changeOrders:[{id:crypto.randomUUID(),job:"Smith",number:"CO-001",title:"Additional concrete patio",amount:4400,status:"sent"}],
+ invoices:[{id:crypto.randomUUID(),job:"Smith",number:"INV-1001",title:"Concrete Stage Payment",amount:12500,status:"due"}],
+ payments:[]
+};
+function persist(){ localStorage.setItem("mp_jobs",JSON.stringify(jobs)); localStorage.setItem("mp_inventory",JSON.stringify(inventory)); localStorage.setItem("mp_money",JSON.stringify(moneyData)); renderAll(); }
+
+function showScreen(id,btn){
+ if(id==="money"&&!can("money")){ alert("Money is restricted to the Super Administrator and Admin / Office."); return; }
+ document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));
+ document.getElementById(id).classList.add("active");
+ document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
+ btn.classList.add("active");
+ if(id==="jobs") renderJobs();
+ if(id==="schedule") renderSchedule();
+ if(id==="money") renderMoney();
+ if(id==="today") renderToday();
+}
+
+function overdue(j){
+ if(!j.nextDate || j.stage==="Complete") return false;
+ return new Date(j.nextDate+"T23:59:59") < new Date();
+}
+function stale(j){ return (Date.now()-j.updated) > 86400000*3 && j.stage!=="Complete"; }
+function needsAttention(j){ return !!j.issue || overdue(j) || stale(j); }
+
+function money(n){ return "$"+Number(n||0).toLocaleString(); }
+
+function renderToday(){
+ const active = jobs.filter(j=>!j.deletedAt && j.stage!=="Complete");
+ const att = active.filter(needsAttention);
+ const behind = active.filter(overdue);
+ const due = active.reduce((s,j)=>s+Number(j.balance||0),0);
+ document.getElementById("mAttention").textContent=att.length;
+ document.getElementById("mBehind").textContent=behind.length;
+ document.getElementById("mActive").textContent=active.length;
+ document.getElementById("mDue").textContent=money(due);
+ document.getElementById("priorityCount").textContent=`${att.length} items`;
+ document.getElementById("priorityList").innerHTML = att.length ? att.slice(0,8).map(j=>`
+   <div class="job" onclick="openDetail('${j.id}')">
+     <div class="row"><strong>${esc(j.customer)}</strong><span class="pill">${esc(j.stage)}</span></div>
+     <div class="tiny">${esc(j.address)}</div>
+     <div class="${overdue(j)?'danger':j.issue?'warn':'muted'}" style="margin-top:4px">${esc(j.issue || (overdue(j)?"Scheduled date has passed":"No activity in 3+ days"))}</div>
+   </div>`).join("") : `<div class="muted">Nothing critical right now.</div>`;
+
+ const counts={}; active.forEach(j=>counts[j.stage]=(counts[j.stage]||0)+1);
+ document.getElementById("stageSummary").innerHTML = Object.entries(counts).map(([s,n])=>`
+   <div style="margin:10px 0">
+     <div class="row"><span>${esc(s)}</span><strong>${n}</strong></div>
+     <div class="stagebar"><div style="width:${Math.min(100,n/Math.max(1,active.length)*100*3)}%"></div></div>
+   </div>`).join("");
+
+ let brief=[];
+ if(att.length) brief.push(`${att.length} active job${att.length===1?"":"s"} need attention.`);
+ if(behind.length) brief.push(`${behind.length} ${behind.length===1?"is":"are"} past the scheduled date.`);
+ const issueJobs=active.filter(j=>j.issue);
+ if(issueJobs.length) brief.push(`Highest-priority blockers: ${issueJobs.slice(0,3).map(j=>j.customer+" — "+j.issue).join("; ")}.`);
+ if(due>0) brief.push(`${money(due)} is currently marked as outstanding across active jobs.`);
+ document.getElementById("dailyBrief").textContent = brief.join(" ") || "No major issues are flagged today.";
+}
+
+function setDivision(v){
+ division=v;
+ ["residential","commercial","inventory"].forEach(x=>document.getElementById("div"+x[0].toUpperCase()+x.slice(1))?.classList.toggle("active",x===v));
+ const labels={residential:"Residential",commercial:"Commercial",inventory:"Pool Inventory"};
+ document.getElementById("jobsHeading").textContent=labels[v];
+ document.getElementById("newJobBtn").textContent=v==="inventory"?"+ Add Pool":"+ New Job";
+ document.getElementById("newJobBtn").onclick=v==="inventory"?addInventoryPool:openNewJob;
+ document.getElementById("jobSearchWrap").style.display=v==="inventory"?"none":"block";
+ renderJobs();
+}
+function renderJobs(){
+ if(division==="inventory") return renderInventory();
+ const q=(document.getElementById("jobSearch")?.value||"").toLowerCase();
+ const list=jobs.filter(j=>!j.deletedAt && (j.jobType||"residential")===division && [j.customer,j.address,j.stage,j.model,j.pm].join(" ").toLowerCase().includes(q));
+ document.getElementById("jobsList").innerHTML = list.length?list.map(j=>`
+ <div class="card" onclick="openDetail('${j.id}')">
+   <div class="row"><h3>${esc(j.customer)}</h3><span class="pill">${esc(j.stage)}</span></div>
+   <div>${esc(j.address)}</div>
+   <div class="tiny">${esc(j.model||"")} ${j.pm?"• PM: "+esc(j.pm):""}</div>
+   <div class="row" style="margin-top:8px">
+     <span class="${j.issue?'warn':'muted'}">${esc(j.issue||"No blocker")}</span>
+     <strong>${money(j.balance)}</strong>
+   </div>
+ </div>`).join(""):`<div class="card muted">No ${division} jobs yet.</div>`;
+}
+function renderInventory(){
+ document.getElementById("jobsList").innerHTML=inventory.length?inventory.map(x=>`<div class="card inventory-card"><div><div class="row"><h3>${esc(x.model)}</h3><span class="pill">${esc(x.status)}</span></div><div>${esc(x.color||"")}</div><div class="tiny">Serial: ${esc(x.serial||"Not assigned")} • ${esc(x.location||"No location")}</div><div class="tiny" style="margin-top:6px">${can("inventory_financials")?`Cost ${money(x.cost)} • Dealer ${money(x.dealerPrice)}`:"Operational inventory view"}</div></div><button class="ghost" onclick="cycleInventoryStatus('${x.id}')">Update</button></div>`).join(""):`<div class="card muted">No pool shells in inventory yet.</div>`;
+}
+function addInventoryPool(){
+ if(!can("inventory")){ alert("Your role does not allow inventory changes."); return; }
+ const model=prompt("Pool model?"); if(!model) return;
+ const color=prompt("Color?")||""; const serial=prompt("Serial number?")||""; const location=prompt("Location?")||"";
+ inventory.unshift({id:crypto.randomUUID(),model,color,serial,location,status:"available",cost:0,dealerPrice:0,retailPrice:0}); persist();
+}
+function cycleInventoryStatus(id){
+ if(!can("inventory")){ alert("Your role does not allow inventory changes."); return; }
+ const x=inventory.find(i=>i.id===id); if(!x) return; const states=["available","reserved","sold","in_production","in_transit","damaged","repair","installed"]; x.status=states[(states.indexOf(x.status)+1)%states.length]; persist();
+}
+function renderMoney(){
+ const outstanding=jobs.reduce((s,j)=>s+Number(j.balance||0),0);
+ const cos=moneyData.changeOrders.filter(x=>!["approved","declined","void"].includes(x.status));
+ const inv=moneyData.invoices.filter(x=>x.status!=="paid");
+ const paid=moneyData.payments.reduce((s,p)=>s+Number(p.amount||0),0);
+ document.getElementById("moneyOutstanding").textContent=money(outstanding);
+ document.getElementById("moneyCOCount").textContent=cos.length;
+ document.getElementById("moneyInvoiceCount").textContent=inv.length;
+ document.getElementById("moneyPaid").textContent=money(paid);
+ document.getElementById("changeOrdersList").innerHTML=moneyData.changeOrders.length?moneyData.changeOrders.map(x=>`<div class="job"><div class="row"><strong>${esc(x.number||"")} • ${esc(x.job||"")}</strong><strong>${money(x.amount)}</strong></div><div>${esc(x.title||"")}</div><div class="tiny">${esc(x.status)}</div></div>`).join(""):`<div class="muted">No change orders yet.</div>`;
+ document.getElementById("invoiceList").innerHTML=moneyData.invoices.length?moneyData.invoices.map(x=>`<div class="job"><div class="row"><strong>${esc(x.number||"")} • ${esc(x.job||"")}</strong><strong>${money(x.amount)}</strong></div><div>${esc(x.title||"")}</div><div class="tiny">${esc(x.status)}</div></div>`).join(""):`<div class="muted">No invoices yet.</div>`;
+}
+
+let scheduleView="list";
+function setScheduleView(v){
+ scheduleView=v;
+ ["list","calendar","gantt"].forEach(x=>document.getElementById("sched"+(x==="calendar"?"Cal":x==="gantt"?"Gantt":"List")+"Btn")?.classList.toggle("active",x===v));
+ const controls=document.getElementById("scheduleControls");
+ if(controls) controls.style.display=v==="list"?"block":"none";
+ renderSchedule();
+}
+function renderSchedule(){
+ if(scheduleView==="calendar") return renderCalendar30();
+ if(scheduleView==="gantt") return renderGantt();
+ const days=Number(document.getElementById("scheduleFilter").value);
+ const end=new Date(); end.setDate(end.getDate()+days);
+ const upcoming=jobs.filter(j=>j.nextDate && new Date(j.nextDate+"T12:00:00")<=end && j.stage!=="Complete")
+   .sort((a,b)=>a.nextDate.localeCompare(b.nextDate));
+ document.getElementById("scheduleList").innerHTML = upcoming.length ? upcoming.map(j=>`
+   <div class="job" onclick="openDetail('${j.id}')">
+     <div class="row"><strong>${esc(j.customer)}</strong><strong class="${overdue(j)?'danger':''}">${fmtDate(j.nextDate)}</strong></div>
+     <div>${esc(j.stage)} • ${esc(j.address)}</div>
+     <div class="tiny">${j.pm?"PM: "+esc(j.pm):""}</div>
+   </div>`).join("") : `<div class="muted">No jobs scheduled in this window.</div>`;
+}
+function dateKey(d){return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())).toISOString().slice(0,10)}
+function renderCalendar30(){
+ const root=document.getElementById("scheduleList");
+ const days=[]; const start=new Date(); start.setHours(12,0,0,0);
+ for(let i=0;i<35;i++){const d=new Date(start);d.setDate(start.getDate()+i);days.push(d)}
+ const byDate={};
+ jobs.filter(j=>!j.deletedAt && j.nextDate && j.stage!=="Complete").forEach(j=>(byDate[j.nextDate] ||= []).push(j));
+ root.innerHTML=`<div class="muted" style="margin-bottom:10px">Next 30 days — tap any job to open it. Scroll sideways on your phone.</div>
+ <div class="calendar-wrap"><div class="calendar-grid">
+ ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(x=>`<div class="cal-head">${x}</div>`).join("")}
+ ${days.map((d,i)=>{const k=dateKey(d),items=byDate[k]||[],today=i===0;return `<div class="cal-day ${today?'today':''}"><div class="cal-date">${d.toLocaleDateString(undefined,{month:'short',day:'numeric'})}</div>${items.map(j=>`<button class="cal-job ${overdue(j)?'overdue':j.issue?'issue':''}" onclick="openDetail('${j.id}')">${esc(j.customer)}<br><span style="font-weight:500">${esc(j.stage)}</span></button>`).join('')}</div>`}).join('')}
+ </div></div>`;
+}
+function renderGantt(){
+ const active=jobs.filter(j=>!j.deletedAt && j.stage!=="Complete").sort((a,b)=>stages.indexOf(a.stage)-stages.indexOf(b.stage));
+ const short={"Sold":"Sold","Permitting":"Permit","Miss Dig":"811","Layout":"Layout","Excavation":"Exc","Pool Set":"Set","Plumbing":"Plumb","Electrical":"Elec","Open Hole Inspection":"Open","Mechanical Inspection":"Mech","Deck Forming":"Form","Bonding/Sand Inspection":"Bond","Concrete":"Conc","Power Cover":"Cover","Fence":"Fence","Startup":"Start","Final Walkthrough":"Walk","Pool School":"School","Final Inspection":"Final","Safety Cover":"Safety","Final Payment":"Pay","Complete":"Done"};
+ document.getElementById("scheduleList").innerHTML=`<div class="muted">All active jobs by stage and progress. Scroll sideways on your phone.</div><div class="gantt-legend"><span><i class="dot done"></i>Completed</span><span><i class="dot current"></i>Current stage</span><span>Orange/red outline = issue or overdue</span></div><div class="gantt-wrap"><div class="gantt-table"><div class="gantt-head"><div>Job</div><div style="display:grid;grid-template-columns:repeat(22,1fr);gap:3px">${stages.map(s=>`<div style="writing-mode:vertical-rl;transform:rotate(180deg);height:74px;text-align:left">${esc(short[s]||s)}</div>`).join('')}</div></div>${active.map(j=>{const idx=stages.indexOf(j.stage);return `<div class="gantt-row" onclick="openDetail('${j.id}')"><div class="gantt-name"><strong>${esc(j.customer)}</strong><span class="tiny">${esc(j.pm||'No PM')} • ${j.nextDate?fmtDate(j.nextDate):'No date'}</span></div><div class="gantt-track">${stages.map((s,i)=>`<div class="gantt-step ${i<idx?'done':''} ${i===idx?'current':''} ${i===idx&&j.issue?'issue':''} ${i===idx&&overdue(j)?'overdue':''}" title="${esc(s)}"></div>`).join('')}</div></div>`}).join('')}</div></div>`;
+}
+
+function openNewJob(){
+ if(!can("create_job")){ alert("Your role does not allow creating jobs."); return; }
+ document.getElementById("dialogTitle").textContent="New Job";
+ ["jobId","customer","address","model","pm","nextDate","balance","issue"].forEach(id=>document.getElementById(id).value="");
+ document.getElementById("jobType").value=division==="commercial"?"commercial":"residential";
+ document.getElementById("stage").value="Sold";
+ jobDialog.showModal();
+}
+function editJob(id){
+ if(!can("edit_job")){ alert("Your role does not allow editing jobs."); return; }
+ const j=jobs.find(x=>x.id===id); if(!j) return;
+ detailDialog.close();
+ document.getElementById("dialogTitle").textContent="Edit Job";
+ for(const [id,val] of Object.entries({jobId:j.id,customer:j.customer,address:j.address,model:j.model,pm:j.pm,nextDate:j.nextDate,balance:j.balance,issue:j.issue})) document.getElementById(id).value=val||"";
+ document.getElementById("stage").value=j.stage;
+ document.getElementById("jobType").value=j.jobType||"residential";
+ jobDialog.showModal();
+}
+function saveJob(){
+ if(!can("edit_job")){ alert("Your role does not allow editing jobs."); return; }
+ const id=document.getElementById("jobId").value;
+ const data={
+   jobType:document.getElementById("jobType").value,
+   customer:document.getElementById("customer").value.trim(),
+   address:document.getElementById("address").value.trim(),
+   model:document.getElementById("model").value.trim(),
+   stage:document.getElementById("stage").value,
+   pm:document.getElementById("pm").value.trim(),
+   nextDate:document.getElementById("nextDate").value,
+   balance:Number(document.getElementById("balance").value||0),
+   issue:document.getElementById("issue").value.trim(),
+   updated:Date.now()
+ };
+ if(!data.customer){ alert("Customer name is required."); return; }
+ if(id){ Object.assign(jobs.find(x=>x.id===id),data); }
+ else jobs.unshift({id:crypto.randomUUID(),...data,tasks:{}});
+ jobDialog.close(); persist();
+}
+function openDetail(id){
+ const j=jobs.find(x=>x.id===id); if(!j) return;
+ const idx=stages.indexOf(j.stage);
+ const tasks=taskTemplates[j.stage]||[];
+ const tstate=j.tasks||{};
+ document.getElementById("jobDetail").innerHTML=`
+   <div class="row"><h2>${esc(j.customer)}</h2><div style="display:flex;gap:6px">
+     ${can("edit_job")?`<button class="ghost" onclick="editJob('${j.id}')">Edit</button>`:""}
+     ${can("trash")?`<button class="danger-btn" onclick="moveJobToTrash('${j.id}')">Trash</button>`:""}
+   </div></div>
+   <div>${esc(j.address)}</div>
+   <div class="tiny">${esc(j.model||"")} ${j.pm?"• PM: "+esc(j.pm):""}</div>
+   <div class="section-title">Current Stage</div>
+   <div class="row"><strong>${esc(j.stage)}</strong><span>${Math.round((idx+1)/stages.length*100)}%</span></div>
+   <div class="stagebar"><div style="width:${((idx+1)/stages.length*100)}%"></div></div>
+   <div class="section-title">Next Date</div>
+   <div>${j.nextDate?fmtDate(j.nextDate):"Not scheduled"}</div>
+   <div class="section-title">Outstanding Balance</div>
+   <div style="font-size:22px;font-weight:800">${money(j.balance)}</div>
+   <div class="section-title">Issue / Blocker</div>
+   <div class="${j.issue?'warn':'muted'}">${esc(j.issue||"None")}</div>
+   <div class="section-title">Tasks for this stage</div>
+   ${tasks.map((t,i)=>`<label class="task">
+     <input type="checkbox" ${tstate[j.stage+"_"+i]?"checked":""} onchange="toggleTask('${j.id}','${j.stage}_${i}',this.checked)">
+     <span class="task-main"><span class="task-title">${esc(t)}</span></span>
+   </label>`).join("")}
+   <div class="dialog-actions">
+     ${idx>0?`<button class="secondary" onclick="advanceStage('${j.id}',-1)">← Back</button>`:""}
+     ${idx<stages.length-1?`<button class="primary" onclick="advanceStage('${j.id}',1)">Advance Stage →</button>`:""}
+   </div>`;
+ detailDialog.showModal();
+}
+function toggleTask(id,key,val){
+ if(!can("edit_job")){ alert("Your role does not allow changing tasks."); renderAll(); return; }
+ const j=jobs.find(x=>x.id===id); j.tasks=j.tasks||{}; j.tasks[key]=val; j.updated=Date.now(); persist();
+}
+function advanceStage(id,delta){
+ if(!can("edit_job")){ alert("Your role does not allow changing job stages."); return; }
+ const j=jobs.find(x=>x.id===id), idx=stages.indexOf(j.stage);
+ const ni=Math.max(0,Math.min(stages.length-1,idx+delta));
+ j.stage=stages[ni]; j.updated=Date.now(); persist(); openDetail(id);
+}
+
+
+function moveJobToTrash(id){
+  if(!can("trash")){ alert("Your role does not allow deleting jobs."); return; }
+  const j=jobs.find(x=>x.id===id); if(!j) return;
+  if(!confirm(`Move ${j.customer} to Trash? You can restore it later.`)) return;
+  j.deletedAt=new Date().toISOString(); j.updated=Date.now();
+  detailDialog.close(); persist();
+}
+function openTrash(){
+  if(!can("trash")){ alert("Trash is restricted to Admin / Office."); return; }
+  document.getElementById("userMenu").classList.remove("open");
+  renderTrash(); trashDialog.showModal();
+}
+function renderTrash(){
+  const deleted=jobs.filter(j=>j.deletedAt).sort((a,b)=>String(b.deletedAt).localeCompare(String(a.deletedAt)));
+  document.getElementById("trashList").innerHTML=deleted.length?deleted.map(j=>`
+    <div class="trash-item">
+      <div class="row"><div><strong>${esc(j.customer)}</strong><div class="tiny">${esc(j.address||"")}</div></div><span class="pill">${esc(j.stage)}</span></div>
+      <div class="tiny" style="margin:7px 0">Deleted ${new Date(j.deletedAt).toLocaleString()}</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button class="success-btn" onclick="restoreJob('${j.id}')">Restore</button>
+        ${isSuperAdmin()?`<button class="danger-btn" onclick="permanentlyDeleteJob('${j.id}')">Permanently Delete</button>`:""}
+      </div>
+    </div>`).join(""):`<div class="card muted">Trash is empty.</div>`;
+}
+function restoreJob(id){
+  if(!can("trash")) return;
+  const j=jobs.find(x=>x.id===id); if(!j) return;
+  j.deletedAt=null; j.updated=Date.now(); persist(); renderTrash();
+}
+function permanentlyDeleteJob(id){
+  if(!isSuperAdmin()){ alert("Only the Super Administrator can permanently delete records."); return; }
+  const j=jobs.find(x=>x.id===id); if(!j) return;
+  if(!confirm(`PERMANENTLY delete ${j.customer}? This cannot be undone.`)) return;
+  jobs=jobs.filter(x=>x.id!==id); persist(); renderTrash();
+}
+
+function askAI(){
+ const q=document.getElementById("aiInput").value.trim().toLowerCase();
+ let out="";
+ const active=jobs.filter(j=>!j.deletedAt && j.stage!=="Complete");
+ if(!q){ out="Ask me about jobs, delays, balances, stages or today's priorities."; }
+ else if(q.includes("behind")||q.includes("late")||q.includes("overdue")){
+   const a=active.filter(overdue); out=a.length?a.map(j=>`• ${j.customer} — ${j.stage} — scheduled ${fmtDate(j.nextDate)}`).join("\n"):"No active jobs are past their scheduled date.";
+ } else if(q.includes("owe")||q.includes("money")||q.includes("payment")||q.includes("balance")){
+   const a=active.filter(j=>Number(j.balance)>0).sort((a,b)=>b.balance-a.balance);
+   out=a.length?`Outstanding total: ${money(a.reduce((s,j)=>s+j.balance,0))}\n\n`+a.map(j=>`• ${j.customer}: ${money(j.balance)} (${j.stage})`).join("\n"):"No outstanding balances are recorded.";
+ } else if(q.includes("attention")||q.includes("problem")||q.includes("blocker")||q.includes("worry")){
+   const a=active.filter(needsAttention); out=a.length?a.map(j=>`• ${j.customer} — ${j.issue || (overdue(j)?"scheduled date passed":"no recent activity")}`).join("\n"):"Nothing is currently flagged for attention.";
+ } else {
+   const matched=stages.find(s=>q.includes(s.toLowerCase().replace("/","")));
+   if(matched){
+     const a=active.filter(j=>j.stage===matched); out=a.length?a.map(j=>`• ${j.customer} — ${j.address}`).join("\n"):`No active jobs are currently in ${matched}.`;
+   } else if(q.includes("concrete")){
+     const a=active.filter(j=>j.stage==="Concrete"); out=a.length?a.map(j=>`• ${j.customer} — ${j.address}`).join("\n"):"No jobs are currently at the concrete stage.";
+   } else {
+     out="I can currently answer from the local job data: jobs behind, payments due, blockers, and jobs by stage. The next version will connect this box to a real AI model so you can ask broader questions and make approved updates by voice.";
+   }
+ }
+ document.getElementById("aiResponse").textContent=out;
+}
+function startVoice(){
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){ alert("Voice dictation is not supported in this browser. You can use your phone keyboard microphone instead."); return; }
+ const r=new SR(); r.lang="en-US"; r.interimResults=false;
+ r.onresult=e=>{ document.getElementById("aiInput").value=e.results[0][0].transcript; askAI(); };
+ r.start();
+}
+
+function fmtDate(s){ if(!s) return ""; return new Date(s+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}); }
+function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m])); }
+function renderAll(){ renderToday(); renderJobs(); renderSchedule(); renderMoney(); }
+document.getElementById("stage").innerHTML=stages.map(s=>`<option>${s}</option>`).join("");
+document.getElementById("todayText").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+
+(async()=>{
+  const {data:{session}}=await sb.auth.getSession();
+  await applySession(session);
+  sb.auth.onAuthStateChange((_event,newSession)=>{ applySession(newSession); });
+})();
+
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+</script>
+</body>
+</html>
