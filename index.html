@@ -239,6 +239,16 @@
     <div id="warrantyList"></div>
   </section>
 
+  <section id="photos" class="screen">
+    <div class="row"><h2>Job Photos</h2><span class="pill">Secure gallery</span></div>
+    <div class="card">
+      <div class="field"><label>Job</label><select id="globalPhotoJob" onchange="loadGlobalPhotos()"></select></div>
+      <div class="photo-actions"><input id="globalPhotoInput" type="file" accept="image/*" capture="environment" multiple><button class="primary" onclick="uploadGlobalPhotos()">Upload Photos</button></div>
+      <div id="globalPhotoStatus" class="photo-status">Select a job to view photos.</div>
+      <div id="globalPhotoGrid" class="photo-grid"></div>
+    </div>
+  </section>
+
   <section id="ai" class="screen">
     <div class="card ai-box">
       <h2>Ask Midwest AI</h2>
@@ -263,6 +273,7 @@
   <button onclick="showScreen('schedule',this)"><span class="ico">📅</span>Schedule</button>
   <button onclick="showScreen('money',this)"><span class="ico">💵</span>Money</button>
   <button onclick="showScreen('warranty',this)"><span class="ico">🛡️</span>Warranty</button>
+  <button onclick="showScreen('photos',this)"><span class="ico">📷</span>Photos</button>
   <button onclick="showScreen('ai',this)"><span class="ico">✨</span>AI</button>
 </nav>
 
@@ -763,6 +774,41 @@ async function deleteJobPhoto(jobId,encodedName){
  const name=decodeURIComponent(encodedName),{error}=await sb.storage.from("job-photos").remove([`${jobId}/${name}`]);
  if(error)return showDataError(error); await loadJobPhotos(jobId);
 }
+function renderPhotos(){
+ const select=document.getElementById("globalPhotoJob"); if(!select)return;
+ const previous=select.value;
+ select.innerHTML=jobs.map(j=>`<option value="${j.id}">${esc(j.customer)} — ${esc(j.address||j.stage)}</option>`).join("");
+ if(previous&&jobs.some(j=>j.id===previous))select.value=previous;
+ if(select.value)loadGlobalPhotos(); else {document.getElementById("globalPhotoStatus").textContent="Create a job before uploading photos.";document.getElementById("globalPhotoGrid").innerHTML="";}
+}
+async function loadGlobalPhotos(){
+ const jobId=document.getElementById("globalPhotoJob").value,status=document.getElementById("globalPhotoStatus"),grid=document.getElementById("globalPhotoGrid");
+ if(!jobId)return;
+ const {data,error}=await sb.storage.from("job-photos").list(jobId,{limit:100,sortBy:{column:"created_at",order:"desc"}});
+ if(error){status.textContent="Photos are unavailable: "+error.message;return;}
+ const files=(data||[]).filter(x=>x.name&&!x.name.startsWith("."));
+ if(!files.length){status.textContent="No job-site photos yet.";grid.innerHTML="";return;}
+ const rows=await Promise.all(files.map(async f=>{const {data:signed}=await sb.storage.from("job-photos").createSignedUrl(`${jobId}/${f.name}`,3600);return {name:f.name,url:signed?.signedUrl};}));
+ status.textContent=`${rows.length} photo${rows.length===1?"":"s"}`;
+ grid.innerHTML=rows.filter(x=>x.url).map(x=>`<div class="photo-tile"><a href="${esc(x.url)}" target="_blank" rel="noopener"><img src="${esc(x.url)}" alt="Job-site photo"></a>${can("edit_job")?`<button title="Delete photo" onclick="deleteGlobalPhoto('${encodeURIComponent(x.name)}')">×</button>`:""}</div>`).join("");
+}
+async function uploadGlobalPhotos(){
+ const jobId=document.getElementById("globalPhotoJob").value,input=document.getElementById("globalPhotoInput"),status=document.getElementById("globalPhotoStatus"),files=[...(input.files||[])];
+ if(!jobId)return alert("Select a job first."); if(!files.length)return alert("Choose one or more photos first.");
+ status.textContent=`Uploading ${files.length} photo${files.length===1?"":"s"}...`;
+ for(const file of files){
+  if(!file.type.startsWith("image/")){status.textContent=`${file.name} is not an image.`;return;}
+  if(file.size>15*1024*1024){status.textContent=`${file.name} is larger than 15 MB.`;return;}
+  const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,"-");
+  const {error}=await sb.storage.from("job-photos").upload(`${jobId}/${Date.now()}-${crypto.randomUUID()}-${safe}`,file,{contentType:file.type,upsert:false});
+  if(error){status.textContent="Upload failed: "+error.message;return;}
+ }
+ input.value=""; await loadGlobalPhotos();
+}
+async function deleteGlobalPhoto(encodedName){
+ const jobId=document.getElementById("globalPhotoJob").value; if(!confirm("Delete this job-site photo?"))return;
+ const {error}=await sb.storage.from("job-photos").remove([`${jobId}/${decodeURIComponent(encodedName)}`]); if(error)return showDataError(error); await loadGlobalPhotos();
+}
 async function toggleTask(id,val){
  if(!can("edit_job")){ alert("Your role does not allow changing tasks."); renderAll(); return; }
  const patch={status:val?"complete":"not_started",completed_at:val?new Date().toISOString():null,completed_by:val?currentUser.id:null,updated_at:new Date().toISOString()};
@@ -848,7 +894,7 @@ function startVoice(){
 
 function fmtDate(s){ if(!s) return ""; return new Date(s+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}); }
 function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m])); }
-function renderAll(){ renderToday(); renderDailyExtras(); renderJobs(); renderSchedule(); if(can("money")) renderMoney(); renderWarranties(); }
+function renderAll(){ renderToday(); renderDailyExtras(); renderJobs(); renderSchedule(); if(can("money")) renderMoney(); renderWarranties(); renderPhotos(); }
 document.getElementById("stage").innerHTML=stages.map(s=>`<option>${s}</option>`).join("");
 document.getElementById("todayText").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
 
