@@ -124,8 +124,11 @@
     .document-upload{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
     .weather-now{font-size:32px;font-weight:850}.weather-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
     .forecast-row{display:grid;grid-template-columns:90px 1fr auto;gap:8px;padding:9px 0;border-top:1px solid var(--line);align-items:center}
+    .contract-builder{border:2px solid #bfdbfe;background:linear-gradient(135deg,#eff6ff,#fff)}
+    .contract-builder-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.contract-line{display:grid;grid-template-columns:1fr 135px 42px;gap:7px;margin:7px 0}
+    .contract-total{font-size:24px;font-weight:900;color:var(--navy)}.contract-terms-preview{max-height:220px;overflow:auto;border:1px solid var(--line);background:#fff;padding:12px;border-radius:10px;font-size:12px;line-height:1.45}
     @media(max-width:520px){.daily-extras{grid-template-columns:1fr}.photo-grid{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:520px){.add-task-grid,.document-upload{grid-template-columns:1fr}}
+    @media(max-width:520px){.add-task-grid,.document-upload,.contract-builder-grid{grid-template-columns:1fr}.contract-line{grid-template-columns:1fr 105px 42px}}
 
   </style>
 </head>
@@ -260,6 +263,32 @@
 
   <section id="contracts" class="screen">
     <div class="row"><h2>Contracts</h2><span class="pill">By Project</span></div>
+    <div class="card contract-builder" id="residentialContractBuilder">
+      <div class="row"><div><h2>Residential Contract Builder</h2><div class="muted">2019 Midwest terms included • prices calculate automatically</div></div><span class="pill">2 pages</span></div>
+      <div class="field"><label>Project</label><select id="builderJob" onchange="loadContractBuilderProject()"></select></div>
+      <div class="contract-builder-grid">
+        <div class="field"><label>Buyer(s)</label><input id="builderBuyer"></div>
+        <div class="field"><label>Contract number</label><input id="builderNumber" placeholder="P-2026-___"></div>
+        <div class="field"><label>Current address</label><input id="builderCurrentAddress"></div>
+        <div class="field"><label>Installation address</label><input id="builderInstallAddress"></div>
+        <div class="field"><label>Phone</label><input id="builderPhone"></div>
+        <div class="field"><label>Email</label><input id="builderEmail" type="email"></div>
+      </div>
+      <div class="row" style="margin-top:10px"><strong>Contract items</strong><button class="ghost" onclick="addContractLine()">+ Add Item</button></div>
+      <div id="contractLines"></div>
+      <div class="contract-builder-grid" style="margin-top:10px">
+        <div class="field"><label>Discount</label><input id="builderDiscount" type="number" min="0" step="100" value="0" oninput="calculateContract()"></div>
+        <div class="field"><label>Contract total</label><div id="builderTotal" class="contract-total">$0.00</div></div>
+      </div>
+      <div class="contract-builder-grid">
+        <div class="field"><label>Down payment %</label><input id="builderDepositPct" type="number" min="0" max="100" step="1" value="10" oninput="calculateContract()"></div>
+        <div class="field"><label>Down payment</label><input id="builderDeposit" readonly></div>
+      </div>
+      <details style="margin-top:10px"><summary><strong>Included Terms Page</strong></summary><div id="contractTermsPreview" class="contract-terms-preview"></div></details>
+      <label class="tiny" style="display:block;margin-top:10px"><input id="builderCustomerVisible" type="checkbox" style="width:auto"> Customer can view saved contract</label>
+      <div class="photo-actions"><button class="secondary" onclick="previewResidentialContract()">Preview / Print PDF</button><button class="primary" onclick="saveResidentialContract()">Save Contract to Project</button></div>
+      <div id="builderStatus" class="photo-status">Choose a project and add the contract items.</div>
+    </div>
     <div class="card">
       <div class="field"><label>Project</label><select id="contractCenterJob" onchange="loadContractCenter()"></select></div>
       <div class="document-upload"><input id="contractCenterTitle" placeholder="Contract title"><input id="contractCenterFile" type="file" accept=".pdf,.doc,.docx,.rtf,.txt"></div>
@@ -834,6 +863,74 @@ async function removeContract(jobId,documentId){
  if(error)return showDataError(error); await loadJobContracts(jobId);
 }
 
+const residentialTerms=[
+  "Buyer’s additional responsibilities include, but are not limited to (unless otherwise noted): grass, high water table, sprinklers, landscaping, driveways, sidewalks, trees and stumps, fences, underground lines of any type, access into yard, determining pool elevation, retaining walls, maintaining water level in pool, diversion of surface water away from pool shell, mortgage survey accuracy, staked survey, certificate of occupancy, final grading, upgrading existing fence to meet code, removing existing obstacles in pool area, electrical breaker space, adequate gas meter sizing, 10-foot clearance of overhead electrical, telephone and cable lines, advising Seller of uncompacted soil, installing silt fencing, remaining out of pool until final inspection and final payment, and approval of homeowner’s association before installation begins.",
+  "Buyer hereby agrees to purchase from Seller, and Seller hereby agrees to sell to Buyer, those goods and services for which prices have been indicated in the Price column on the terms and conditions set forth herein. The provision of such goods and services may be referred to herein as the Project.",
+  "Buyer shall provide access to the Project site for all Seller personnel, material and equipment necessary for the Project. Seller may store necessary materials and equipment on the Project site at no cost to Seller.",
+  "In addition to the Contract Price set forth on the face of this agreement, Buyer shall, upon demand from Seller, pay and/or reimburse Seller for all costs of removing, remedying or otherwise addressing any circumstance or condition necessary to complete the Project, including but not limited to removing underground obstacles, removing, refilling and compacting filled ground, controlling water seepage, and removing rock which exceeds the capacity of a 12-foot by 14-foot backhoe. Seller may terminate the Project if Buyer fails to pay and/or reimburse Seller for such costs upon Seller’s demand.",
+  "Buyer agrees that vehicles, machinery and equipment are required to complete the Project and will be operated on Buyer’s property or adjoining or adjacent property. Buyer consents to this operation and shall hold Seller harmless from, and indemnify Seller for, liability relating to damage to landscaping, grass, shrubbery, driveways, walks, trees, patios or the like caused directly or indirectly by Seller.",
+  "All electrical upgrading to meet building codes is Buyer’s responsibility. Buyer is also responsible for electrical, gas line, concrete decking, alternate access for installation, and removal or replacement of fencing unless otherwise provided herein. Seller is not responsible for landscaping the Project site or providing an access path to and from the pool.",
+  "Buyer shall hold Seller harmless from, and indemnify Seller for, liability relating to damage to underground lines, including telephone, sprinkler, electrical, gas, sewer and water lines, caused directly or indirectly by the Project. Except as otherwise provided herein, Buyer shall reroute such lines before the Project begins.",
+  "The pool shall be installed at the existing elevation of the installation site unless otherwise provided in this Agreement.",
+  "All dimensions specified in this Agreement are approximate and pool-shell dimensions are exterior dimensions. For each item on the preceding page identified with an asterisk, the quantity is an estimate. The Contract Price will be reduced if actual quantity is less and increased if actual quantity exceeds the estimate; Buyer shall pay any increase upon demand from Seller.",
+  "This Agreement contains the entire agreement between the parties and supersedes all previous oral and written agreements. It may be amended only by a subsequent written amendment signed by both parties. Additions to goods or services shall be paid in advance. Credits or refunds will be adjusted by any discount applied to the original Agreement.",
+  "Seller warrants for 12 months from the day of Midwest Final all labor and materials supplied for installation of plumbing, electrical and gas services only to the pool. This is Seller’s only warranty regarding the purchased pool. The pool manufacturer provides the only product warranty, which Seller will assign and deliver upon final payment. The applicable Manufacturer’s Warranty is available at Seller’s office. Buyer’s sole recourse regarding the pool is against its manufacturer. Seller is not responsible for repairing or replacing such goods, and Buyer shall hold Seller harmless and fully indemnify Seller, including defense costs, from liability or damage relating to product defects. These warranties are not assignable and cover only the named Buyer. Seller provides no other express or implied warranty; these warranty remedies are Buyer’s only remedies.",
+  "Buyer agrees to fully read and comply with all instructions in the Pool Use & Care Manual upon receipt.",
+  "Buyer shall pay the Contract Price in installments shown on the agreement, with the down payment due when Buyer signs. All amounts paid to Seller are nonrefundable.",
+  "If Buyer fails to perform an obligation, Seller may, in addition to other remedies: terminate this Agreement; enter the Project site, remove the pool and other goods and recover removal costs plus 18% annual interest; recover enforcement costs, including attorney fees and court costs, plus 18% annual interest; and retain all amounts received from Buyer.",
+  "Buyer shall not use or permit others to use the pool until Seller confirms the Project is completed and ready to use and Seller has been paid in full. Use by Buyer or any third party constitutes Buyer’s acceptance that the Project is complete and complies with this Agreement.",
+  "Any dispute arising from this Agreement or Seller’s performance shall be resolved only by arbitration before one mutually acceptable arbitrator. Arbitration is the exclusive remedy. If the parties cannot agree, either may request appointment by the American Arbitration Association, and arbitration will proceed under its Construction Arbitration Rules. The award is final and binding and judgment may be entered by a court with jurisdiction. The arbitrator shall allocate arbitration costs and attorneys’ fees against the non-prevailing party in favor of the prevailing party. Written notice of demand for arbitration shall be filed with the other party and the American Arbitration Association.",
+  "Waiver of a breach is not a waiver of a later breach. Delay in enforcing a remedy or exercising a right is not a waiver.",
+  "Buyer agrees to a nonrefundable amount of $1,000 plus costs incurred if the contract is cancelled after three business days from the date signed.",
+  "Buyer agrees that they have fully read and understand these provisions and consulted, or had the opportunity to consult, legal counsel regarding their rights and obligations, and agrees to them."
+];
+function addContractLine(description="",amount=""){
+ const row=document.createElement("div");row.className="contract-line";
+ row.innerHTML=`<input class="contract-item" placeholder="Pool, equipment, service or allowance" value="${esc(description)}"><input class="contract-amount" type="number" min="0" step="100" placeholder="Price" value="${esc(amount)}" oninput="calculateContract()"><button class="danger-btn" aria-label="Remove item" onclick="this.parentElement.remove();calculateContract()">×</button>`;
+ document.getElementById("contractLines").appendChild(row);calculateContract();
+}
+function calculateContract(){
+ const subtotal=[...document.querySelectorAll(".contract-amount")].reduce((sum,x)=>sum+Number(x.value||0),0);
+ const discount=Math.max(0,Number(document.getElementById("builderDiscount")?.value||0));
+ const total=Math.max(0,subtotal-discount),pct=Math.max(0,Math.min(100,Number(document.getElementById("builderDepositPct")?.value||0)));
+ document.getElementById("builderTotal").textContent=total.toLocaleString("en-US",{style:"currency",currency:"USD"});
+ document.getElementById("builderDeposit").value=(total*pct/100).toLocaleString("en-US",{style:"currency",currency:"USD"});
+ return {subtotal,discount,total,deposit:total*pct/100,pct};
+}
+function renderContractBuilder(){
+ const select=document.getElementById("builderJob");if(!select)return;const previous=select.value;
+ select.innerHTML=jobs.filter(j=>!j.deletedAt&&j.jobType!=="commercial").map(j=>`<option value="${j.id}">${esc(j.customer)} — ${esc(j.address||j.stage)}</option>`).join("");
+ if(previous&&jobs.some(j=>j.id===previous))select.value=previous;
+ if(!document.querySelector(".contract-line")){addContractLine("Pool shell and standard equipment","");addContractLine("Installation labor","");addContractLine("Optional equipment and services","");}
+ document.getElementById("contractTermsPreview").innerHTML=`<strong>BUYER’S ADDITIONAL RESPONSIBILITIES</strong><p>${esc(residentialTerms[0])}</p><strong>TERMS AND CONDITIONS</strong><ol>${residentialTerms.slice(1).map(x=>`<li>${esc(x)}</li>`).join("")}</ol><p><strong>Buyer’s Initial(s): ______ / ______</strong></p>`;
+ loadContractBuilderProject();
+}
+function loadContractBuilderProject(){
+ const job=jobs.find(j=>j.id===document.getElementById("builderJob")?.value);if(!job)return;
+ document.getElementById("builderBuyer").value=job.customer||"";document.getElementById("builderInstallAddress").value=job.address||"";
+}
+function contractFormData(){
+ const totals=calculateContract(),jobId=document.getElementById("builderJob").value;
+ return {jobId,buyer:document.getElementById("builderBuyer").value.trim(),number:document.getElementById("builderNumber").value.trim(),currentAddress:document.getElementById("builderCurrentAddress").value.trim(),installAddress:document.getElementById("builderInstallAddress").value.trim(),phone:document.getElementById("builderPhone").value.trim(),email:document.getElementById("builderEmail").value.trim(),items:[...document.querySelectorAll(".contract-line")].map(r=>({description:r.querySelector(".contract-item").value.trim(),amount:Number(r.querySelector(".contract-amount").value||0)})).filter(x=>x.description),...totals};
+}
+function contractDocumentHtml(d){
+ const cur=n=>Number(n||0).toLocaleString("en-US",{style:"currency",currency:"USD"}),date=new Date().toLocaleDateString();
+ return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(d.number||"Residential Contract")}</title><style>@page{size:letter;margin:.45in}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;font-size:11px;line-height:1.35;margin:0}h1,h2{text-align:center;margin:4px}.header{text-align:center;border-bottom:2px solid #111;padding-bottom:8px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 20px;margin:12px 0}.items{width:100%;border-collapse:collapse}.items th,.items td{border:1px solid #555;padding:6px}.items th{background:#eee}.right{text-align:right}.total{font-size:15px;font-weight:bold}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:35px;margin-top:35px}.line{border-top:1px solid #111;padding-top:4px}.page{page-break-after:always;min-height:9.5in}.terms{font-size:9.5px}.terms li{margin-bottom:5px}.notice{border:1px solid #111;padding:8px;margin:12px 0;font-weight:bold}</style></head><body><section class="page"><div class="header"><h1>MIDWEST POOLS, INC.</h1><div>3090 West Cook Road • Grand Blanc, MI 48439 • (877) 450-7665</div><h2>Residential Pool Agreement</h2></div><div class="grid"><div><b>Buyer(s):</b> ${esc(d.buyer)}</div><div><b>Date:</b> ${date}</div><div><b>Current Address:</b> ${esc(d.currentAddress)}</div><div><b>Contract:</b> ${esc(d.number)}</div><div><b>Installation Address:</b> ${esc(d.installAddress)}</div><div><b>Phone:</b> ${esc(d.phone)}</div><div></div><div><b>Email:</b> ${esc(d.email)}</div></div><table class="items"><thead><tr><th>ITEM</th><th style="width:145px">PRICE</th></tr></thead><tbody>${d.items.map(x=>`<tr><td>${esc(x.description)}</td><td class="right">${cur(x.amount)}</td></tr>`).join("")}<tr><td class="right"><b>Subtotal</b></td><td class="right">${cur(d.subtotal)}</td></tr><tr><td class="right"><b>Discount</b></td><td class="right">-${cur(d.discount)}</td></tr><tr><td class="right total">CONTRACT PRICE</td><td class="right total">${cur(d.total)}</td></tr></tbody></table><h3>Payment Schedule</h3><table class="items"><tr><td>Down payment (${d.pct}%)</td><td class="right">${cur(d.deposit)}</td></tr><tr><td>Remaining contract balance according to project payment schedule</td><td class="right">${cur(d.total-d.deposit)}</td></tr></table><div class="notice">You, the Buyer, may cancel this transaction at any time prior to midnight of the third business day after the date this transaction is signed. You must notify Seller in writing of the intent to cancel.</div><p>The attached Terms and Conditions page is part of this Agreement. Buyer acknowledges receiving and reviewing both pages.</p><div class="signatures"><div class="line">Buyer / Date</div><div class="line">Midwest Pools, Inc. / Date</div><div class="line">Buyer / Date</div><div></div></div></section><section class="terms"><h2>BUYER’S ADDITIONAL RESPONSIBILITIES</h2><p>${esc(residentialTerms[0])}</p><p><b>Buyer’s Initial(s): ______ / ______</b></p><h2>TERMS AND CONDITIONS</h2><ol>${residentialTerms.slice(1).map(x=>`<li>${esc(x)}</li>`).join("")}</ol><p><b>Buyer’s Initial(s): ______ / ______ &nbsp; © Midwest Pools Inc. 2019</b></p></section></body></html>`;
+}
+function previewResidentialContract(){
+ const d=contractFormData();if(!d.jobId||!d.buyer||!d.items.length)return alert("Select a project, enter the buyer, and add at least one contract item.");
+ const w=window.open("","_blank");if(!w)return alert("Allow pop-ups to preview the contract.");w.document.write(contractDocumentHtml(d));w.document.close();setTimeout(()=>w.print(),350);
+}
+async function saveResidentialContract(){
+ if(!can("manage_contracts"))return alert("Only the Super Administrator or Admin / Office can save contracts.");
+ const d=contractFormData(),status=document.getElementById("builderStatus");if(!d.jobId||!d.buyer||!d.items.length)return alert("Select a project, enter the buyer, and add at least one contract item.");
+ status.textContent="Saving residential contract...";const html=contractDocumentHtml(d),title=`Residential Contract ${d.number||d.buyer}`.trim(),safe=(d.number||d.buyer).replace(/[^a-zA-Z0-9_-]/g,"-");
+ const path=`${d.jobId}/contracts/${Date.now()}-${safe}.html`,file=new Blob([html],{type:"text/html"});
+ const {error:uploadError}=await sb.storage.from("portal-documents").upload(path,file,{contentType:"text/html",upsert:false});if(uploadError){status.textContent="Save failed: "+uploadError.message;return;}
+ const {error}=await sb.from("portal_documents").insert({job_id:d.jobId,document_type:"contract",title,storage_path:path,uploaded_by:currentUser.id,visible_to_customer:document.getElementById("builderCustomerVisible").checked,visible_to_financing:false});
+ if(error){await sb.storage.from("portal-documents").remove([path]);status.textContent="Save failed: "+error.message;return;}status.textContent="Contract saved to this project. Use Open below to review or print it.";await loadContractCenter();
+}
+
 function renderContractCenter(){
  const select=document.getElementById("contractCenterJob"); if(!select)return;
  const previous=select.value;
@@ -842,6 +939,7 @@ function renderContractCenter(){
 }
 async function loadContractCenter(){
  renderContractCenter();
+ renderContractBuilder();
  const jobId=document.getElementById("contractCenterJob")?.value,status=document.getElementById("contractCenterStatus"),list=document.getElementById("contractCenterList");
  if(!jobId){status.textContent="Create or select a project first.";list.innerHTML="";return;}
  const {data,error}=await sb.from("portal_documents").select("id,title,storage_path,visible_to_customer,created_at").eq("job_id",jobId).eq("document_type","contract").is("deleted_at",null).order("created_at",{ascending:false});
