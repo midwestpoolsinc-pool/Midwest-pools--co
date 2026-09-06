@@ -108,6 +108,15 @@
     .trash-item{padding:12px 0;border-top:1px solid var(--line)}.trash-item:first-child{border-top:none}
     .danger-btn{background:#fee2e2;color:#991b1b}.success-btn{background:#dcfce7;color:#166534}
     .security-note{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.35}
+    .daily-extras{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .daily-extra{background:linear-gradient(135deg,#eff6ff,#f8fafc)}
+    .daily-extra .emoji{font-size:25px;margin-bottom:6px}.daily-extra strong{display:block;margin-bottom:5px}
+    .photo-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+    .photo-actions input{max-width:100%}.photo-status{font-size:12px;color:var(--muted)}
+    .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+    .photo-tile{position:relative;aspect-ratio:1;background:#e5e7eb;border-radius:10px;overflow:hidden}
+    .photo-tile img{width:100%;height:100%;object-fit:cover;display:block}.photo-tile button{position:absolute;right:5px;top:5px;padding:4px 7px;background:rgba(127,29,29,.9);color:#fff}
+    @media(max-width:520px){.daily-extras{grid-template-columns:1fr}.photo-grid{grid-template-columns:repeat(2,1fr)}}
 
   </style>
 </head>
@@ -156,6 +165,11 @@
     <div class="card ai-box">
       <h2>AI Daily Brief</h2>
       <div id="dailyBrief">Loading...</div>
+    </div>
+
+    <div class="daily-extras">
+      <div class="card daily-extra"><div class="emoji">😄</div><strong>Daily Joke</strong><div id="dailyJoke"></div></div>
+      <div class="card daily-extra"><div class="emoji">💡</div><strong>Fun Fact</strong><div id="dailyFunFact"></div></div>
     </div>
 
     <div class="card">
@@ -423,6 +437,25 @@ let inventory = [];
 let warranties = [];
 let profiles = [];
 let moneyData = {changeOrders:[],invoices:[],payments:[]};
+const dailyJokes=[
+ "Why did the pool contractor bring a pencil? To draw a deep end!",
+ "Why was the swimming pool so good at business? It always made a splash.",
+ "What did one pool say to the other? Water you doing today?",
+ "Why don't pool builders rush? They know good work needs time to settle.",
+ "A clean pool and a finished punch list have one thing in common: everybody sleeps better."
+];
+const dailyFacts=[
+ "A 20-by-40-foot pool can lose hundreds of gallons a week to evaporation during hot, windy weather.",
+ "Proper water balance protects pool surfaces, equipment, heaters, and customer comfort at the same time.",
+ "Fiberglass pool shells flex slightly, which helps them tolerate normal ground movement.",
+ "Most job delays become easier to solve when the blocker, owner, and next action are written down together.",
+ "Photographing plumbing before backfill creates a permanent map for future service work."
+];
+function renderDailyExtras(){
+ const start=new Date(new Date().getFullYear(),0,0),day=Math.floor((new Date()-start)/86400000);
+ document.getElementById("dailyJoke").textContent=dailyJokes[day%dailyJokes.length];
+ document.getElementById("dailyFunFact").textContent=dailyFacts[day%dailyFacts.length];
+}
 
 function dbJob(row,profileMap){
  return {id:row.id,jobType:row.division,customer:row.customer_name,address:row.address,model:row.pool_model,
@@ -684,6 +717,10 @@ function openDetail(id){
    <div style="font-size:22px;font-weight:800">${money(j.balance)}</div>
    <div class="section-title">Issue / Blocker</div>
    <div class="${j.issue?'warn':'muted'}">${esc(j.issue||"None")}</div>
+   <div class="section-title">Job-Site Photos</div>
+   ${can("edit_job")?`<div class="photo-actions"><input id="jobPhotoInput" type="file" accept="image/*" capture="environment" multiple><button class="primary" onclick="uploadJobPhotos('${j.id}')">Upload Photos</button></div>`:""}
+   <div id="photoStatus" class="photo-status">Loading photos...</div>
+   <div id="jobPhotoGrid" class="photo-grid"></div>
    <div class="section-title">Tasks for this stage</div>
    ${tasks.map(t=>`<label class="task">
      <input type="checkbox" ${t.status==="complete"?"checked":""} onchange="toggleTask('${t.id}',this.checked)">
@@ -694,6 +731,37 @@ function openDetail(id){
      ${idx<stages.length-1?`<button class="primary" onclick="advanceStage('${j.id}',1)">Advance Stage →</button>`:""}
    </div>`;
  detailDialog.showModal();
+ loadJobPhotos(j.id);
+}
+async function loadJobPhotos(jobId){
+ const status=document.getElementById("photoStatus"),grid=document.getElementById("jobPhotoGrid"); if(!status||!grid)return;
+ const {data,error}=await sb.storage.from("job-photos").list(jobId,{limit:100,sortBy:{column:"created_at",order:"desc"}});
+ if(error){status.textContent="Photos are unavailable: "+error.message;return;}
+ const files=(data||[]).filter(x=>x.name&&!x.name.startsWith("."));
+ if(!files.length){status.textContent="No job-site photos yet.";grid.innerHTML="";return;}
+ const rows=await Promise.all(files.map(async f=>{const path=`${jobId}/${f.name}`;const {data:signed}=await sb.storage.from("job-photos").createSignedUrl(path,3600);return {name:f.name,path,url:signed?.signedUrl};}));
+ status.textContent=`${rows.length} photo${rows.length===1?"":"s"}`;
+ grid.innerHTML=rows.filter(x=>x.url).map(x=>`<div class="photo-tile"><a href="${esc(x.url)}" target="_blank" rel="noopener"><img src="${esc(x.url)}" alt="Job-site photo"></a>${can("edit_job")?`<button title="Delete photo" onclick="deleteJobPhoto('${jobId}','${encodeURIComponent(x.name)}')">×</button>`:""}</div>`).join("");
+}
+async function uploadJobPhotos(jobId){
+ if(!can("edit_job"))return;
+ const input=document.getElementById("jobPhotoInput"),status=document.getElementById("photoStatus"),files=[...(input?.files||[])];
+ if(!files.length){alert("Choose one or more photos first.");return;}
+ status.textContent=`Uploading ${files.length} photo${files.length===1?"":"s"}...`;
+ for(const file of files){
+   if(!file.type.startsWith("image/")){status.textContent=`${file.name} is not an image.`;return;}
+   if(file.size>15*1024*1024){status.textContent=`${file.name} is larger than 15 MB.`;return;}
+   const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,"-");
+   const path=`${jobId}/${Date.now()}-${crypto.randomUUID()}-${safe}`;
+   const {error}=await sb.storage.from("job-photos").upload(path,file,{contentType:file.type,upsert:false});
+   if(error){status.textContent="Upload failed: "+error.message;return;}
+ }
+ input.value=""; await loadJobPhotos(jobId);
+}
+async function deleteJobPhoto(jobId,encodedName){
+ if(!can("edit_job")||!confirm("Delete this job-site photo?"))return;
+ const name=decodeURIComponent(encodedName),{error}=await sb.storage.from("job-photos").remove([`${jobId}/${name}`]);
+ if(error)return showDataError(error); await loadJobPhotos(jobId);
 }
 async function toggleTask(id,val){
  if(!can("edit_job")){ alert("Your role does not allow changing tasks."); renderAll(); return; }
@@ -780,7 +848,7 @@ function startVoice(){
 
 function fmtDate(s){ if(!s) return ""; return new Date(s+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}); }
 function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m])); }
-function renderAll(){ renderToday(); renderJobs(); renderSchedule(); if(can("money")) renderMoney(); renderWarranties(); }
+function renderAll(){ renderToday(); renderDailyExtras(); renderJobs(); renderSchedule(); if(can("money")) renderMoney(); renderWarranties(); }
 document.getElementById("stage").innerHTML=stages.map(s=>`<option>${s}</option>`).join("");
 document.getElementById("todayText").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
 
