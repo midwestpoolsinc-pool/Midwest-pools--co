@@ -116,7 +116,14 @@
     .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
     .photo-tile{position:relative;aspect-ratio:1;background:#e5e7eb;border-radius:10px;overflow:hidden}
     .photo-tile img{width:100%;height:100%;object-fit:cover;display:block}.photo-tile button{position:absolute;right:5px;top:5px;padding:4px 7px;background:rgba(127,29,29,.9);color:#fff}
+    .task-stage{border:1px solid var(--line);border-radius:12px;padding:10px;margin:9px 0;background:#fafafa}
+    .task-stage summary{cursor:pointer;font-weight:800;display:flex;justify-content:space-between;gap:8px}
+    .task-off{opacity:.6;text-decoration:line-through}.task-tools{display:flex;gap:6px;align-items:center}
+    .task-tools button{padding:6px 9px;font-size:11px}.add-task-grid{display:grid;grid-template-columns:1fr 150px auto;gap:7px;margin:8px 0}
+    .document-item{padding:10px 0;border-top:1px solid var(--line)}.document-item:first-child{border-top:none}
+    .document-upload{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
     @media(max-width:520px){.daily-extras{grid-template-columns:1fr}.photo-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:520px){.add-task-grid,.document-upload{grid-template-columns:1fr}}
 
   </style>
 </head>
@@ -342,8 +349,8 @@ function roleLabel(r){
 }
 function can(permission){
   const rules={
-    super_admin:["money","edit_job","create_job","inventory","inventory_write","inventory_financials","trash","permanent_delete","warranty","schedule","ai"],
-    admin_office:["money","edit_job","create_job","inventory","inventory_write","inventory_financials","trash","warranty","schedule","ai"],
+    super_admin:["money","edit_job","create_job","manage_tasks","manage_contracts","inventory","inventory_write","inventory_financials","trash","permanent_delete","warranty","schedule","ai"],
+    admin_office:["money","edit_job","create_job","manage_tasks","manage_contracts","inventory","inventory_write","inventory_financials","trash","warranty","schedule","ai"],
     employee_pm:["edit_job","inventory","warranty","schedule","ai"],
     subcontractor:["warranty","schedule","ai"],
     customer:["warranty","ai"]
@@ -472,7 +479,8 @@ function dbJob(row,profileMap){
  return {id:row.id,jobType:row.division,customer:row.customer_name,address:row.address,model:row.pool_model,
    stage:row.stage,pm:profileMap[row.project_manager_id]||"",projectManagerId:row.project_manager_id,
    nextDate:row.next_scheduled_date,balance:Number(row.outstanding_balance||0),issue:row.blocker||"",
-   updated:new Date(row.updated_at).getTime(),deletedAt:row.deleted_at,tasks:(row.job_tasks||[]).filter(t=>!t.deleted_at)};
+   updated:new Date(row.updated_at).getTime(),deletedAt:row.deleted_at,
+   tasks:(row.job_tasks||[]).filter(t=>!t.deleted_at),allTasks:row.job_tasks||[]};
 }
 function dbInventory(row){ return {id:row.id,model:row.model,color:row.color,serial:row.serial_number,location:row.location,status:row.status,cost:Number(row.cost||0),dealerPrice:Number(row.dealer_price||0),retailPrice:Number(row.retail_price||0)}; }
 async function loadData(){
@@ -711,7 +719,9 @@ async function saveJob(){
 function openDetail(id){
  const j=jobs.find(x=>x.id===id); if(!j) return;
  const idx=stages.indexOf(j.stage);
- const tasks=(j.tasks||[]).filter(t=>t.stage===j.stage);
+ const activeTasks=j.tasks||[], inactiveTasks=(j.allTasks||[]).filter(t=>t.deleted_at);
+ const taskGroups=stages.map(stage=>({stage,tasks:activeTasks.filter(t=>(t.stage||"Other")===stage)})).filter(g=>g.tasks.length);
+ const otherTasks=activeTasks.filter(t=>!stages.includes(t.stage)); if(otherTasks.length) taskGroups.push({stage:"Other",tasks:otherTasks});
  document.getElementById("jobDetail").innerHTML=`
    <div class="row"><h2>${esc(j.customer)}</h2><div style="display:flex;gap:6px">
      ${can("edit_job")?`<button class="ghost" onclick="editJob('${j.id}')">Edit</button>`:""}
@@ -732,17 +742,65 @@ function openDetail(id){
    ${can("edit_job")?`<div class="photo-actions"><input id="jobPhotoInput" type="file" accept="image/*" capture="environment" multiple><button class="primary" onclick="uploadJobPhotos('${j.id}')">Upload Photos</button></div>`:""}
    <div id="photoStatus" class="photo-status">Loading photos...</div>
    <div id="jobPhotoGrid" class="photo-grid"></div>
-   <div class="section-title">Tasks for this stage</div>
-   ${tasks.map(t=>`<label class="task">
-     <input type="checkbox" ${t.status==="complete"?"checked":""} onchange="toggleTask('${t.id}',this.checked)">
-     <span class="task-main"><span class="task-title">${esc(t.title)}</span></span>
-   </label>`).join("")}
+   <div class="section-title">Contracts & Project Documents</div>
+   ${can("manage_contracts")?`<div class="document-upload"><input id="contractTitle" placeholder="Contract title"><input id="contractFile" type="file" accept=".pdf,.doc,.docx,.rtf,.txt"></div><label class="tiny"><input id="contractCustomerVisible" type="checkbox" style="width:auto"> Customer can view this contract</label><button class="primary" style="width:100%;margin-top:8px" onclick="uploadContract('${j.id}')">Upload Custom Contract</button>`:""}
+   <div id="contractStatus" class="photo-status">Loading contracts...</div><div id="contractList"></div>
+   <div class="section-title">All Project Tasks</div>
+   ${can("manage_tasks")?`<div class="add-task-grid"><input id="newTaskTitle" placeholder="Add a custom task"><select id="newTaskStage">${stages.map(s=>`<option ${s===j.stage?'selected':''}>${esc(s)}</option>`).join('')}</select><button class="primary" onclick="addProjectTask('${j.id}')">Add</button></div>`:""}
+   ${taskGroups.length?taskGroups.map(g=>`<details class="task-stage" ${g.stage===j.stage?'open':''}><summary><span>${esc(g.stage)}</span><span class="pill">${g.tasks.filter(t=>t.status==='complete').length}/${g.tasks.length}</span></summary>${g.tasks.map(t=>`<div class="task"><input type="checkbox" ${t.status==="complete"?"checked":""} onchange="toggleTask('${t.id}',this.checked)"><span class="task-main"><span class="task-title">${esc(t.title)}</span>${t.notes?`<div class="tiny">${esc(t.notes)}</div>`:''}</span>${can("manage_tasks")?`<span class="task-tools"><button class="ghost" onclick="turnOffTask('${j.id}','${t.id}')">Turn Off</button></span>`:''}</div>`).join('')}</details>`).join(''):'<div class="muted">No active tasks. Add the tasks needed for this project.</div>'}
+   ${can("manage_tasks")&&inactiveTasks.length?`<details class="task-stage"><summary><span>Turned-Off Tasks</span><span class="pill">${inactiveTasks.length}</span></summary>${inactiveTasks.map(t=>`<div class="task task-off"><span class="task-main">${esc(t.title)} <span class="tiny">• ${esc(t.stage||'Other')}</span></span><button class="success-btn" onclick="restoreProjectTask('${j.id}','${t.id}')">Turn Back On</button></div>`).join('')}</details>`:''}
    <div class="dialog-actions">
      ${idx>0?`<button class="secondary" onclick="advanceStage('${j.id}',-1)">← Back</button>`:""}
      ${idx<stages.length-1?`<button class="primary" onclick="advanceStage('${j.id}',1)">Advance Stage →</button>`:""}
    </div>`;
- detailDialog.showModal();
+ if(!detailDialog.open) detailDialog.showModal();
  loadJobPhotos(j.id);
+ loadJobContracts(j.id);
+}
+
+async function addProjectTask(jobId){
+ if(!can("manage_tasks"))return;
+ const title=document.getElementById("newTaskTitle").value.trim(),stage=document.getElementById("newTaskStage").value;
+ if(!title)return alert("Type the task name first.");
+ const {error}=await sb.from("job_tasks").insert({job_id:jobId,title,stage,status:"not_started"});
+ if(error)return showDataError(error); await loadData(); openDetail(jobId);
+}
+async function turnOffTask(jobId,taskId){
+ if(!can("manage_tasks")||!confirm("Turn this task off for this project? You can turn it back on later."))return;
+ const {error}=await sb.rpc("move_to_trash",{p_table:"job_tasks",p_id:taskId});
+ if(error)return showDataError(error); await loadData(); openDetail(jobId);
+}
+async function restoreProjectTask(jobId,taskId){
+ if(!can("manage_tasks"))return;
+ const {error}=await sb.rpc("restore_from_trash",{p_table:"job_tasks",p_id:taskId});
+ if(error)return showDataError(error); await loadData(); openDetail(jobId);
+}
+
+async function loadJobContracts(jobId){
+ const status=document.getElementById("contractStatus"),list=document.getElementById("contractList"); if(!status||!list)return;
+ const {data,error}=await sb.from("portal_documents").select("id,title,storage_path,visible_to_customer,created_at").eq("job_id",jobId).eq("document_type","contract").is("deleted_at",null).order("created_at",{ascending:false});
+ if(error){status.textContent="Contracts are unavailable: "+error.message;return;}
+ const docs=await Promise.all((data||[]).map(async d=>{const {data:signed}=await sb.storage.from("portal-documents").createSignedUrl(d.storage_path,3600);return {...d,url:signed?.signedUrl};}));
+ status.textContent=docs.length?`${docs.length} custom contract${docs.length===1?'':'s'}`:"No custom contracts uploaded yet.";
+ list.innerHTML=docs.map(d=>`<div class="document-item"><div class="row"><div><strong>${esc(d.title)}</strong><div class="tiny">${new Date(d.created_at).toLocaleString()}${d.visible_to_customer?' • Customer visible':''}</div></div><div class="task-tools">${d.url?`<button class="ghost" onclick="window.open('${esc(d.url)}','_blank')">Open</button>`:''}${can("manage_contracts")?`<button class="danger-btn" onclick="removeContract('${jobId}','${d.id}')">Remove</button>`:''}</div></div></div>`).join('');
+}
+async function uploadContract(jobId){
+ if(!can("manage_contracts"))return;
+ const input=document.getElementById("contractFile"),file=input.files?.[0],title=document.getElementById("contractTitle").value.trim()||file?.name;
+ const visible=document.getElementById("contractCustomerVisible").checked,status=document.getElementById("contractStatus");
+ if(!file)return alert("Choose the contract file first.");
+ status.textContent="Uploading contract...";
+ const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,"-"),path=`${jobId}/contracts/${Date.now()}-${crypto.randomUUID()}-${safe}`;
+ const {error:uploadError}=await sb.storage.from("portal-documents").upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false});
+ if(uploadError){status.textContent="Upload failed: "+uploadError.message;return;}
+ const {error}=await sb.from("portal_documents").insert({job_id:jobId,document_type:"contract",title,storage_path:path,uploaded_by:currentUser.id,visible_to_customer:visible,visible_to_financing:false});
+ if(error){await sb.storage.from("portal-documents").remove([path]);status.textContent=error.message;return;}
+ input.value="";document.getElementById("contractTitle").value="";document.getElementById("contractCustomerVisible").checked=false;await loadJobContracts(jobId);
+}
+async function removeContract(jobId,documentId){
+ if(!can("manage_contracts")||!confirm("Remove this contract from the project?"))return;
+ const {error}=await sb.rpc("move_to_trash",{p_table:"portal_documents",p_id:documentId});
+ if(error)return showDataError(error); await loadJobContracts(jobId);
 }
 async function loadJobPhotos(jobId){
  const status=document.getElementById("photoStatus"),grid=document.getElementById("jobPhotoGrid"); if(!status||!grid)return;
@@ -811,8 +869,9 @@ async function deleteGlobalPhoto(encodedName){
 }
 async function toggleTask(id,val){
  if(!can("edit_job")){ alert("Your role does not allow changing tasks."); renderAll(); return; }
+ const job=jobs.find(j=>(j.allTasks||[]).some(t=>t.id===id));
  const patch={status:val?"complete":"not_started",completed_at:val?new Date().toISOString():null,completed_by:val?currentUser.id:null,updated_at:new Date().toISOString()};
- const {error}=await sb.from("job_tasks").update(patch).eq("id",id); if(error) return showDataError(error); await loadData();
+ const {error}=await sb.from("job_tasks").update(patch).eq("id",id); if(error) return showDataError(error); await loadData(); if(job)openDetail(job.id);
 }
 async function advanceStage(id,delta){
  if(!can("edit_job")){ alert("Your role does not allow changing job stages."); return; }
