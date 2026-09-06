@@ -39,8 +39,8 @@
     .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; font-weight:700; }
     .job { padding:12px 0; border-top:1px solid var(--line); }
     .job:first-child { border-top:none; }
-    nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(6,1fr); z-index:10; padding-bottom:env(safe-area-inset-bottom); }
-    nav button { background:#fff; border-radius:0; padding:11px 4px 9px; color:#6b7280; font-size:12px; }
+    nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--line); display:flex; overflow-x:auto; z-index:10; padding-bottom:env(safe-area-inset-bottom); }
+    nav button { flex:1 0 72px; background:#fff; border-radius:0; padding:11px 4px 9px; color:#6b7280; font-size:11px; }
     nav button.active { color:var(--accent); }
     nav .ico { display:block; font-size:20px; margin-bottom:2px; }
     .screen { display:none; }
@@ -122,6 +122,8 @@
     .task-tools button{padding:6px 9px;font-size:11px}.add-task-grid{display:grid;grid-template-columns:1fr 150px auto;gap:7px;margin:8px 0}
     .document-item{padding:10px 0;border-top:1px solid var(--line)}.document-item:first-child{border-top:none}
     .document-upload{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+    .weather-now{font-size:32px;font-weight:850}.weather-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .forecast-row{display:grid;grid-template-columns:90px 1fr auto;gap:8px;padding:9px 0;border-top:1px solid var(--line);align-items:center}
     @media(max-width:520px){.daily-extras{grid-template-columns:1fr}.photo-grid{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:520px){.add-task-grid,.document-upload{grid-template-columns:1fr}}
 
@@ -256,6 +258,30 @@
     </div>
   </section>
 
+  <section id="contracts" class="screen">
+    <div class="row"><h2>Contracts</h2><span class="pill">By Project</span></div>
+    <div class="card">
+      <div class="field"><label>Project</label><select id="contractCenterJob" onchange="loadContractCenter()"></select></div>
+      <div class="document-upload"><input id="contractCenterTitle" placeholder="Contract title"><input id="contractCenterFile" type="file" accept=".pdf,.doc,.docx,.rtf,.txt"></div>
+      <label class="tiny"><input id="contractCenterVisible" type="checkbox" style="width:auto"> Customer can view this contract</label>
+      <button class="primary" style="width:100%;margin-top:8px" onclick="uploadContractFromCenter()">Upload Custom Contract</button>
+      <div id="contractCenterStatus" class="photo-status">Select a project.</div>
+      <div id="contractCenterList"></div>
+    </div>
+  </section>
+
+  <section id="weather" class="screen">
+    <div class="row"><h2>Project Weather</h2><span class="pill">Live + Tracked</span></div>
+    <div class="card">
+      <div class="field"><label>Project location</label><select id="weatherJob" onchange="loadProjectWeather()"></select></div>
+      <button class="primary" style="width:100%" onclick="refreshProjectWeather()">Refresh Current Weather</button>
+      <div id="weatherStatus" class="photo-status" style="margin-top:8px">Select a project.</div>
+    </div>
+    <div id="weatherCurrent"></div>
+    <div class="card"><h2>5-Day Forecast</h2><div id="weatherForecast" class="muted">Refresh weather to load the forecast.</div></div>
+    <div class="card"><h2>Weather History</h2><div id="weatherHistory" class="muted">Recorded checks for this project will appear here.</div></div>
+  </section>
+
   <section id="ai" class="screen">
     <div class="card ai-box">
       <h2>Ask Midwest AI</h2>
@@ -281,6 +307,8 @@
   <button onclick="showScreen('money',this)"><span class="ico">💵</span>Money</button>
   <button onclick="showScreen('warranty',this)"><span class="ico">🛡️</span>Warranty</button>
   <button onclick="showScreen('photos',this)"><span class="ico">📷</span>Photos</button>
+  <button onclick="showScreen('contracts',this)"><span class="ico">📄</span>Contracts</button>
+  <button onclick="showScreen('weather',this)"><span class="ico">🌦️</span>Weather</button>
   <button onclick="showScreen('ai',this)"><span class="ico">✨</span>AI</button>
 </nav>
 
@@ -480,6 +508,7 @@ function dbJob(row,profileMap){
    stage:row.stage,pm:profileMap[row.project_manager_id]||"",projectManagerId:row.project_manager_id,
    nextDate:row.next_scheduled_date,balance:Number(row.outstanding_balance||0),issue:row.blocker||"",
    updated:new Date(row.updated_at).getTime(),deletedAt:row.deleted_at,
+   weatherLatitude:row.weather_latitude,weatherLongitude:row.weather_longitude,weatherLocation:row.weather_location_name,weatherCheckedAt:row.weather_last_checked_at,
    tasks:(row.job_tasks||[]).filter(t=>!t.deleted_at),allTasks:row.job_tasks||[]};
 }
 function dbInventory(row){ return {id:row.id,model:row.model,color:row.color,serial:row.serial_number,location:row.location,status:row.status,cost:Number(row.cost||0),dealerPrice:Number(row.dealer_price||0),retailPrice:Number(row.retail_price||0)}; }
@@ -525,6 +554,8 @@ function showScreen(id,btn){
  if(id==="schedule") renderSchedule();
  if(id==="money") renderMoney();
  if(id==="today") renderToday();
+ if(id==="contracts") loadContractCenter();
+ if(id==="weather") loadProjectWeather();
 }
 
 function overdue(j){
@@ -802,6 +833,85 @@ async function removeContract(jobId,documentId){
  const {error}=await sb.rpc("move_to_trash",{p_table:"portal_documents",p_id:documentId});
  if(error)return showDataError(error); await loadJobContracts(jobId);
 }
+
+function renderContractCenter(){
+ const select=document.getElementById("contractCenterJob"); if(!select)return;
+ const previous=select.value;
+ select.innerHTML=jobs.filter(j=>!j.deletedAt).map(j=>`<option value="${j.id}">${esc(j.customer)} — ${esc(j.address||j.stage)}</option>`).join("");
+ if(previous&&jobs.some(j=>j.id===previous))select.value=previous;
+}
+async function loadContractCenter(){
+ renderContractCenter();
+ const jobId=document.getElementById("contractCenterJob")?.value,status=document.getElementById("contractCenterStatus"),list=document.getElementById("contractCenterList");
+ if(!jobId){status.textContent="Create or select a project first.";list.innerHTML="";return;}
+ const {data,error}=await sb.from("portal_documents").select("id,title,storage_path,visible_to_customer,created_at").eq("job_id",jobId).eq("document_type","contract").is("deleted_at",null).order("created_at",{ascending:false});
+ if(error){status.textContent="Contracts are unavailable: "+error.message;return;}
+ const docs=await Promise.all((data||[]).map(async d=>{const {data:signed}=await sb.storage.from("portal-documents").createSignedUrl(d.storage_path,3600);return {...d,url:signed?.signedUrl};}));
+ status.textContent=docs.length?`${docs.length} custom contract${docs.length===1?'':'s'}`:"No custom contracts uploaded for this project yet.";
+ list.innerHTML=docs.map(d=>`<div class="document-item"><div class="row"><div><strong>${esc(d.title)}</strong><div class="tiny">${new Date(d.created_at).toLocaleString()}${d.visible_to_customer?' • Customer visible':''}</div></div><div class="task-tools">${d.url?`<button class="ghost" onclick="window.open('${esc(d.url)}','_blank')">Open</button>`:''}${can("manage_contracts")?`<button class="danger-btn" onclick="removeContractFromCenter('${d.id}')">Remove</button>`:''}</div></div></div>`).join('');
+}
+async function uploadContractFromCenter(){
+ if(!can("manage_contracts"))return alert("Only the Super Administrator or Admin / Office can upload contracts.");
+ const jobId=document.getElementById("contractCenterJob").value,input=document.getElementById("contractCenterFile"),file=input.files?.[0];
+ const title=document.getElementById("contractCenterTitle").value.trim()||file?.name,visible=document.getElementById("contractCenterVisible").checked,status=document.getElementById("contractCenterStatus");
+ if(!jobId||!file)return alert("Select a project and contract file first.");
+ status.textContent="Uploading contract...";
+ const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,"-"),path=`${jobId}/contracts/${Date.now()}-${crypto.randomUUID()}-${safe}`;
+ const {error:uploadError}=await sb.storage.from("portal-documents").upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false});
+ if(uploadError){status.textContent="Upload failed: "+uploadError.message;return;}
+ const {error}=await sb.from("portal_documents").insert({job_id:jobId,document_type:"contract",title,storage_path:path,uploaded_by:currentUser.id,visible_to_customer:visible,visible_to_financing:false});
+ if(error){await sb.storage.from("portal-documents").remove([path]);status.textContent=error.message;return;}
+ input.value="";document.getElementById("contractCenterTitle").value="";document.getElementById("contractCenterVisible").checked=false;await loadContractCenter();
+}
+async function removeContractFromCenter(documentId){
+ if(!can("manage_contracts")||!confirm("Remove this contract from the project?"))return;
+ const {error}=await sb.rpc("move_to_trash",{p_table:"portal_documents",p_id:documentId}); if(error)return showDataError(error); await loadContractCenter();
+}
+
+function renderWeatherControls(){
+ const select=document.getElementById("weatherJob"); if(!select)return;
+ const previous=select.value;
+ select.innerHTML=jobs.filter(j=>!j.deletedAt).map(j=>`<option value="${j.id}">${esc(j.customer)} — ${esc(j.address||j.stage)}</option>`).join("");
+ if(previous&&jobs.some(j=>j.id===previous))select.value=previous;
+}
+function weatherDescription(code){
+ if(code===0)return "Clear"; if([1,2].includes(code))return "Partly cloudy"; if(code===3)return "Overcast";
+ if([45,48].includes(code))return "Fog"; if(code>=51&&code<=67)return "Rain"; if(code>=71&&code<=77)return "Snow";
+ if(code>=80&&code<=82)return "Rain showers"; if(code>=85&&code<=86)return "Snow showers"; if(code>=95)return "Thunderstorms"; return "Mixed conditions";
+}
+function weatherLocationQuery(address){const parts=String(address||"").split(",").map(x=>x.trim()).filter(Boolean);return parts.length>1?parts.slice(-2).join(", "):address;}
+async function loadProjectWeather(){
+ renderWeatherControls();
+ const jobId=document.getElementById("weatherJob")?.value,job=jobs.find(j=>j.id===jobId);
+ const status=document.getElementById("weatherStatus"),current=document.getElementById("weatherCurrent"),history=document.getElementById("weatherHistory");
+ if(!job){status.textContent="Create or select a project first.";current.innerHTML="";return;}
+ status.textContent=job.weatherLocation?`Weather location: ${job.weatherLocation}`:`Ready to locate ${job.address}.`;
+ const {data,error}=await sb.from("job_weather_snapshots").select("*").eq("job_id",jobId).order("observed_at",{ascending:false}).limit(20);
+ if(error){history.textContent="Weather history is unavailable: "+error.message;return;}
+ const rows=data||[];
+ if(rows.length){const w=rows[0];current.innerHTML=`<div class="card"><div class="row"><div><div class="label">Last Recorded</div><div class="weather-now">${Math.round(Number(w.temperature_f))}°F</div><strong>${esc(w.summary||weatherDescription(w.weather_code))}</strong></div><div style="text-align:right"><div>Feels ${Math.round(Number(w.apparent_temperature_f))}°</div><div>Wind ${Math.round(Number(w.wind_speed_mph))} mph</div><div>Rain ${Math.round(Number(w.precipitation_probability||0))}%</div></div></div><div class="tiny" style="margin-top:8px">Checked ${new Date(w.observed_at).toLocaleString()}</div></div>`;}
+ else current.innerHTML='<div class="card muted">No weather recorded yet. Click Refresh Current Weather.</div>';
+ history.innerHTML=rows.length?rows.map(w=>`<div class="forecast-row"><span>${new Date(w.observed_at).toLocaleDateString()}</span><span>${esc(w.summary||weatherDescription(w.weather_code))}</span><strong>${Math.round(Number(w.temperature_f))}°F</strong></div>`).join(''):"No weather checks recorded yet.";
+}
+async function refreshProjectWeather(){
+ const jobId=document.getElementById("weatherJob")?.value,job=jobs.find(j=>j.id===jobId),status=document.getElementById("weatherStatus"); if(!job)return;
+ status.textContent="Finding the project and checking current weather...";
+ try{
+  let lat=job.weatherLatitude,lon=job.weatherLongitude,location=job.weatherLocation;
+  if(lat==null||lon==null){
+   const q=weatherLocationQuery(job.address),geo=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=en&format=json&countryCode=US`).then(r=>r.json());
+   const found=geo.results?.[0]; if(!found)throw new Error("I could not locate this project address. Add the city, state and ZIP to the job address.");
+   lat=found.latitude;lon=found.longitude;location=[found.name,found.admin1].filter(Boolean).join(", ");
+   const {error}=await sb.from("jobs").update({weather_latitude:lat,weather_longitude:lon,weather_location_name:location,weather_last_checked_at:new Date().toISOString()}).eq("id",jobId); if(error)throw error;
+  }
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=5`;
+  const w=await fetch(url).then(r=>r.json()); if(!w.current)throw new Error("Weather service did not return current conditions.");
+  const summary=weatherDescription(w.current.weather_code),rain=w.daily?.precipitation_probability_max?.[0]||0;
+  const {error}=await sb.from("job_weather_snapshots").insert({job_id:jobId,observed_at:new Date().toISOString(),weather_code:w.current.weather_code,temperature_f:w.current.temperature_2m,apparent_temperature_f:w.current.apparent_temperature,precipitation_probability:rain,wind_speed_mph:w.current.wind_speed_10m,summary,created_by:currentUser.id}); if(error)throw error;
+  document.getElementById("weatherForecast").innerHTML=w.daily.time.map((d,i)=>`<div class="forecast-row"><strong>${new Date(d+'T12:00:00').toLocaleDateString(undefined,{weekday:'short'})}</strong><span>${esc(weatherDescription(w.daily.weather_code[i]))} • Rain ${Math.round(w.daily.precipitation_probability_max[i]||0)}%</span><strong>${Math.round(w.daily.temperature_2m_max[i])}° / ${Math.round(w.daily.temperature_2m_min[i])}°</strong></div>`).join('');
+  job.weatherLatitude=lat;job.weatherLongitude=lon;job.weatherLocation=location;status.textContent=`Current weather for ${location}`;await loadProjectWeather();
+ }catch(error){status.textContent=error.message||"Weather could not be loaded.";}
+}
 async function loadJobPhotos(jobId){
  const status=document.getElementById("photoStatus"),grid=document.getElementById("jobPhotoGrid"); if(!status||!grid)return;
  const {data,error}=await sb.storage.from("job-photos").list(jobId,{limit:100,sortBy:{column:"created_at",order:"desc"}});
@@ -953,7 +1063,7 @@ function startVoice(){
 
 function fmtDate(s){ if(!s) return ""; return new Date(s+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}); }
 function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m])); }
-function renderAll(){ renderToday(); renderDailyExtras(); renderJobs(); renderSchedule(); if(can("money")) renderMoney(); renderWarranties(); renderPhotos(); }
+function renderAll(){ renderToday(); renderDailyExtras(); renderJobs(); renderSchedule(); if(can("money")) renderMoney(); renderWarranties(); renderPhotos(); renderContractCenter(); renderWeatherControls(); }
 document.getElementById("stage").innerHTML=stages.map(s=>`<option>${s}</option>`).join("");
 document.getElementById("todayText").textContent=new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
 
